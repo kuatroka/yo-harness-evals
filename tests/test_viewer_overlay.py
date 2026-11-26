@@ -17,6 +17,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 from viewer_overlay import app as overlay_app
 from viewer_overlay import columns, harbor_api, launch, registry, runner, static_build
@@ -444,6 +445,7 @@ class JSONApp:
 
 def run_asgi(app, path: str = "/api/jobs") -> list[dict[str, Any]]:
     sent: list[dict[str, Any]] = []
+    parts = urlsplit(path)
 
     async def receive() -> dict[str, Any]:
         return {"type": "http.request", "body": b"", "more_body": False}
@@ -451,7 +453,19 @@ def run_asgi(app, path: str = "/api/jobs") -> list[dict[str, Any]]:
     async def send(message: dict[str, Any]) -> None:
         sent.append(message)
 
-    asyncio.run(app({"type": "http", "method": "GET", "path": path, "headers": []}, receive, send))
+    asyncio.run(
+        app(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": parts.path,
+                "query_string": parts.query.encode("latin-1"),
+                "headers": [],
+            },
+            receive,
+            send,
+        )
+    )
     return sent
 
 
@@ -509,6 +523,84 @@ class MiddlewareTest(unittest.TestCase):
         start = messages[0]
         headers = dict(start["headers"])
         self.assertEqual(int(headers[b"content-length"]), len(body_of(messages)))
+
+    def test_agent_filter_options_merge_to_display_names(self):
+        body = json.dumps(
+            {
+                "agents": [
+                    {"value": "amp-code", "count": 146},
+                    {"value": "harnesses.amp:AmpAgent", "count": 1},
+                    {"value": "factory-droid", "count": 137},
+                    {"value": "codex", "count": 29},
+                    {"value": "harbor.agents.installed.codex:Codex", "count": 1},
+                ]
+            }
+        ).encode("utf-8")
+        messages = run_asgi(
+            OverlayJSONMiddleware(JSONApp(body)), path="/api/rollouts/filters"
+        )
+        payload = json.loads(body_of(messages))
+
+        self.assertEqual(
+            payload["agents"],
+            [
+                {"value": "Amp", "count": 147},
+                {"value": "Droid", "count": 137},
+                {"value": "Codex", "count": 30},
+            ],
+        )
+
+    def test_agent_filter_request_expands_the_display_name(self):
+        seen: dict[str, bytes] = {}
+
+        class Probe:
+            async def __call__(self, scope, receive, send) -> None:
+                seen["query"] = scope.get("query_string", b"")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b"{}"})
+
+        run_asgi(
+            OverlayJSONMiddleware(Probe()),
+            path="/api/rollouts?agent=Amp&model=devin%2Fswe-2-1-max",
+        )
+        params = parse_qs(seen["query"].decode("latin-1"))
+
+        self.assertEqual(
+            set(params["agent"]),
+            {"amp-code", "harnesses.amp:AmpAgent", "amp"},
+        )
+        self.assertEqual(params["model"], ["devin/swe-2-1-max"])
+
+    def test_agent_filter_request_keeps_a_raw_value(self):
+        seen: dict[str, bytes] = {}
+
+        class Probe:
+            async def __call__(self, scope, receive, send) -> None:
+                seen["query"] = scope.get("query_string", b"")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b"{}"})
+
+        run_asgi(
+            OverlayJSONMiddleware(Probe()),
+            path="/api/rollouts?agent=amp-code",
+        )
+
+        self.assertEqual(
+            parse_qs(seen["query"].decode("latin-1")),
+            {"agent": ["amp-code"]},
+        )
 
     def test_empty_job_summary_is_filled_from_a_trial_config(self):
         # A job can lose its top-level config.json while keeping its trials.

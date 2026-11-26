@@ -13,6 +13,10 @@ class DisplayAgentNameTest(unittest.TestCase):
             "factory-droid": "Droid",
             "harnesses.claude:ClaudeCodeAgent": "Claude Code",
             "claude-code": "Claude Code",
+            "harnesses.codex:Codex": "Codex",
+            "harbor.agents.installed.codex:Codex": "Codex",
+            "codex": "Codex",
+            "Codex": "Codex",
         }
         for raw, expected in cases.items():
             with self.subTest(raw=raw):
