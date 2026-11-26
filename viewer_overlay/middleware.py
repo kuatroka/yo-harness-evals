@@ -1,12 +1,14 @@
-"""Rewrite the viewer's own JSON on the way out.
+"""Rewrite the viewer's labels and filter values at the API boundary.
 
 Harbor's API carries raw identifiers, so the labels a person reads are fixed at
-the response boundary here instead of inside the compiled SPA. That keeps the
-mapping in one place, survives a bundle rebuild, and lets the jobs table show a
-total token column that the installed bundle does not know about.
+the response boundary here instead of inside the compiled SPA. Filter options
+are ``{value, count}`` objects, so those values are mapped and their counts
+merged. A selected display name is expanded back to every raw value before the
+request reaches Harbor, which keeps filtering working without naming the
+dropdown after an implementation detail.
 
 Buffering is safe because these are API payloads, not streams. Anything that is
-not JSON, and any `/stream` path, is replayed byte for byte.
+not JSON, and any ``/stream`` path, is replayed byte for byte.
 """
 
 from __future__ import annotations
@@ -14,8 +16,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Awaitable, Callable
+from urllib.parse import parse_qsl, urlencode
 
-from .display import display_agent_name, display_model_name, display_names
+from .display import (
+    AGENT_FILTER_ALIASES,
+    display_agent_name,
+    display_model_name,
+    display_names,
+)
 
 Scope = dict[str, Any]
 Message = dict[str, Any]
@@ -23,6 +31,7 @@ Receive = Callable[[], Awaitable[Message]]
 Send = Callable[[Message], Awaitable[None]]
 
 AGENT_KEYS = frozenset({"agent_name", "reported_agent_name"})
+FILTER_LIST_PATHS = frozenset({"/api/jobs", "/api/rollouts"})
 JSON_TYPE = b"application/json"
 
 
@@ -36,7 +45,11 @@ class OverlayJSONMiddleware:
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope.get("type") != "http" or not eligible(scope.get("path", "")):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        scope = _rewrite_filter_request(scope)
+        if not eligible(scope.get("path", "")):
             await self.app(scope, receive, send)
             return
 
@@ -68,6 +81,32 @@ class OverlayJSONMiddleware:
             await send(message)
 
         await self.app(scope, receive, inspect)
+
+
+def _rewrite_filter_request(scope: Scope) -> Scope:
+    """Expand a display agent name into every raw id it stands for."""
+    path = scope.get("path", "")
+    is_trial_list = path.startswith("/api/jobs/") and path.endswith("/trials")
+    if path not in FILTER_LIST_PATHS and not is_trial_list:
+        return scope
+    query = scope.get("query_string", b"")
+    if not query:
+        return scope
+
+    pairs = parse_qsl(query.decode("latin-1"), keep_blank_values=True)
+    expanded: list[tuple[str, str]] = []
+    changed = False
+    for key, value in pairs:
+        if key == "agent":
+            aliases = AGENT_FILTER_ALIASES.get(value)
+            if aliases:
+                expanded.extend((key, alias) for alias in aliases)
+                changed = True
+                continue
+        expanded.append((key, value))
+    if not changed:
+        return scope
+    return {**scope, "query_string": urlencode(expanded).encode("latin-1")}
 
 
 def eligible(path: str) -> bool:
@@ -105,6 +144,8 @@ def _rewrite_mapping(node: dict[str, Any], jobs_dir: Path | None) -> dict[str, A
             out[key] = display_agent_name(value)
         elif key == "agents" and _all_text(value):
             out[key] = display_names(list(value), display_agent_name)
+        elif key == "agents" and _filter_options(value):
+            out[key] = _map_filter_options(value)
         elif key == "models" and _all_text(value):
             out[key] = display_names(
                 list(value), lambda name: display_model_name(name, effort)
@@ -226,6 +267,23 @@ def _job_dir(jobs_dir: Path, job_name: str) -> Path | None:
 
 def _all_text(value: Any) -> bool:
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _filter_options(value: Any) -> bool:
+    return isinstance(value, list) and all(
+        isinstance(item, dict) and isinstance(item.get("value"), str) for item in value
+    )
+
+
+def _map_filter_options(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Map option labels and merge the counts of values that collapse together."""
+    counts: dict[str, int] = {}
+    for option in options:
+        value = option["value"]
+        label = display_agent_name(value) or value
+        count = option.get("count")
+        counts[label] = counts.get(label, 0) + (count if _is_whole(count) else 0)
+    return [{"value": label, "count": count} for label, count in counts.items()]
 
 
 def _sum_of(node: dict[str, Any], first: str, second: str) -> int | None:

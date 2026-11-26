@@ -4,7 +4,8 @@ The API carries raw identifiers: job configs name the agent class
 (``harnesses.amp:AmpAgent``) and trial results name the model with its route
 prefix (``engy/deepseek-v4.1-flash-1017(max)``). Neither reads well in a table,
 so those two fields are rewritten at the API response boundary, which covers
-every page at once.
+every page at once. Filter options carry the same raw agent values, and a
+selected display name is expanded back to them before Harbor sees the request.
 
 Everything else stays raw: ``providers`` still says ``devin`` or ``engy``, and
 ``reasoning_effort`` keeps its own column.
@@ -27,7 +28,21 @@ AGENT_DISPLAY_NAMES = {
     "harnesses.claude:ClaudeCodeAgent": "Claude Code",
     "claude-code": "Claude Code",
     "claude": "Claude Code",
+    "harnesses.codex:Codex": "Codex",
+    "harbor.agents.installed.codex:Codex": "Codex",
+    "codex": "Codex",
 }
+
+
+def _agent_filter_aliases() -> dict[str, tuple[str, ...]]:
+    """Every raw agent value that a display name stands for."""
+    aliases: dict[str, list[str]] = {}
+    for raw, display in AGENT_DISPLAY_NAMES.items():
+        aliases.setdefault(display, []).append(raw)
+    return {display: tuple(raws) for display, raws in aliases.items()}
+
+
+AGENT_FILTER_ALIASES = _agent_filter_aliases()
 
 
 def display_agent_name(name: str | None) -> str | None:
