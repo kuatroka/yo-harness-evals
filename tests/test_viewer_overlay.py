@@ -470,6 +470,49 @@ class MiddlewareTest(unittest.TestCase):
         headers = dict(start["headers"])
         self.assertEqual(int(headers[b"content-length"]), len(body_of(messages)))
 
+    def test_empty_job_summary_is_filled_from_a_trial_config(self):
+        # A job can lose its top-level config.json while keeping its trials.
+        # Harbor then lists it with every config-derived column blank.
+        with tempfile.TemporaryDirectory() as tmp:
+            jobs = Path(tmp) / "jobs"
+            trial = jobs / "lost-config" / "task__abc"
+            trial.mkdir(parents=True)
+            (trial / "config.json").write_text(
+                json.dumps(
+                    {
+                        "task": {"source": "bench-fast"},
+                        "agent": {
+                            "name": "harnesses.amp:AmpAgent",
+                            "model_name": "engy/deepseek-v4.1-flash-1017(max)",
+                        },
+                        "environment": {"type": "docker"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            body = json.dumps(
+                {
+                    "items": [
+                        {
+                            "name": "lost-config",
+                            "datasets": [],
+                            "agents": [],
+                            "providers": [],
+                            "models": [],
+                            "environment_type": None,
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+            messages = run_asgi(OverlayJSONMiddleware(JSONApp(body), jobs_dir=jobs))
+            item = json.loads(body_of(messages))["items"][0]
+
+        self.assertEqual(item["datasets"], ["bench-fast"])
+        self.assertEqual(item["agents"], ["Amp"])
+        self.assertEqual(item["providers"], ["engy"])
+        self.assertEqual(item["models"], ["deepseek-v4.1-flash-1017(max)"])
+        self.assertEqual(item["environment_type"], "docker")
+
     def test_applied_twice_equals_applied_once(self):
         body = json.dumps(self.payload()).encode("utf-8")
         once = run_asgi(OverlayJSONMiddleware(JSONApp(body)))
