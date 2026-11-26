@@ -530,6 +530,7 @@ class MiddlewareTest(unittest.TestCase):
                 "agents": [
                     {"value": "amp-code", "count": 146},
                     {"value": "harnesses.amp:AmpAgent", "count": 1},
+                    {"value": "claude-code", "count": 92},
                     {"value": "factory-droid", "count": 137},
                     {"value": "codex", "count": 29},
                     {"value": "harbor.agents.installed.codex:Codex", "count": 1},
@@ -545,6 +546,7 @@ class MiddlewareTest(unittest.TestCase):
             payload["agents"],
             [
                 {"value": "Amp", "count": 147},
+                {"value": "Claude Code", "count": 92},
                 {"value": "Droid", "count": 137},
                 {"value": "Codex", "count": 30},
             ],
@@ -576,6 +578,16 @@ class MiddlewareTest(unittest.TestCase):
             {"amp-code", "harnesses.amp:AmpAgent", "amp"},
         )
         self.assertEqual(params["model"], ["devin/swe-2-1-max"])
+
+        run_asgi(
+            OverlayJSONMiddleware(Probe()),
+            path="/api/rollouts?agent=Claude+Code",
+        )
+        params = parse_qs(seen["query"].decode("latin-1"))
+        self.assertEqual(
+            set(params["agent"]),
+            {"harnesses.claude:ClaudeCodeAgent", "claude-code", "claude"},
+        )
 
     def test_agent_filter_request_keeps_a_raw_value(self):
         seen: dict[str, bytes] = {}
