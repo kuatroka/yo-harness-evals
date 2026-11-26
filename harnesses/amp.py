@@ -33,44 +33,36 @@ from .common import (
 )
 
 AmpEffort = Literal["high", "xhigh", "max"]
-AmpModel = Literal[
-    "deepseek-flash-high",
-    "deepseek-flash-max",
-    "deepseek-engy-high",
-    "deepseek-engy-max",
-    "haiku-amp-native",
-    "haiku-devin-max",
-    "swe-2-max",
-    "swe-2-high",
-    "swe-2-flash-max",
-    "swe-2-flash-high",
-    "swe-2-1-xhigh",
-    "swe-2-1-max",
-]
 
 
 class AmpOptions(InstalledAgentOptions):
     effort: AmpEffort = Field(
         default="high",
-        description="Amp mode effort. The mode plugin maps this to a model variant.",
+        description="Amp reasoning effort, passed to the CLI with --effort.",
     )
-    model: AmpModel | None = Field(
+    model: str | None = Field(
         default=None,
         description=(
-            "Amp mode model. Defaults to the DeepSeek Flash variant for the "
-            "selected effort."
+            "Route for Amp's model selector, for example devin/swe-2-1-max. "
+            "Defaults to the DeepSeek Flash variant for the selected effort."
         ),
+    )
+    model_id: str | None = Field(
+        default=None,
+        description="Canonical registry id, for metadata.",
     )
 
 
 class AmpAgent(BaseInstalledAgent):
     """Run Amp Code inside a Harbor task container.
 
-    Amp's model routing is account-side. The adapter writes a small local
-    plugin that registers one mode per model key. Routes prefixed ``devin/`` or
-    ``engy/`` resolve through the user's 9Router connection; an
-    ``anthropic/...`` mode uses Amp's own Claude access and never touches
-    9Router.
+    Amp takes the route with ``--model`` and the level with ``--effort``. The
+    registry owns model names and routes; this adapter keeps no mode table and
+    uploads no plugin.
+
+    Routes prefixed ``devin/`` or ``engy/`` resolve through the user's 9Router
+    connection; an ``anthropic/...`` route uses Amp's own Claude access and
+    never touches 9Router.
 
     ``AMP_API_KEY`` must be an Amp account access token (``sgamp_...``) from
     Settings -> Security. The short-lived session token stored by ``amp login``
@@ -79,237 +71,14 @@ class AmpAgent(BaseInstalledAgent):
 
     capabilities = AgentCapabilities(reasoning_effort=True)
 
-    MODE_SPECS: ClassVar[dict[AmpModel, dict[str, str]]] = {
-        "deepseek-flash-high": {
-            "label": "DV DS Flash 4.1 high",
-            "model": "devin/deepseek-v4.1-flash-high",
-            "effort": "high",
-            "color": "#10b981",
-        },
-        "deepseek-flash-max": {
-            "label": "DV DS Flash 4.1 max",
-            "model": "devin/deepseek-v4.1-flash-max",
-            "effort": "max",
-            "color": "#10b981",
-        },
-        "deepseek-engy-high": {
-            "label": "Engy DS Flash 4.1 high",
-            "model": "engy/deepseek-v4.1-flash-1017(high)",
-            "effort": "high",
-            "color": "#0ea5e9",
-        },
-        "deepseek-engy-max": {
-            "label": "Engy DS Flash 4.1 max",
-            "model": "engy/deepseek-v4.1-flash-1017(max)",
-            "effort": "max",
-            "color": "#0ea5e9",
-        },
-        "haiku-amp-native": {
-            "label": "Amp Claude Haiku 5.5 max",
-            "model": "anthropic/claude-haiku-5-5",
-            "effort": "max",
-            "color": "#f97316",
-        },
-        "haiku-devin-max": {
-            "label": "DV Haiku 5.5 max",
-            "model": "devin/haiku-5-5-max",
-            "effort": "max",
-            "color": "#f59e0b",
-        },
-        "swe-2-max": {
-            "label": "DV SWE-2 max",
-            "model": "devin/swe-2-max",
-            "effort": "max",
-            "color": "#7c3aed",
-        },
-        "swe-2-high": {
-            "label": "DV SWE-2 high",
-            "model": "devin/swe-2-high",
-            "effort": "high",
-            "color": "#7c3aed",
-        },
-        "swe-2-flash-max": {
-            "label": "DV SWE-2 Flash max",
-            "model": "devin/swe-2-flash-max",
-            "effort": "max",
-            "color": "#a855f7",
-        },
-        "swe-2-flash-high": {
-            "label": "DV SWE-2 Flash high",
-            "model": "devin/swe-2-flash-high",
-            "effort": "high",
-            "color": "#a855f7",
-        },
-        "swe-2-1-xhigh": {
-            "label": "DV SWE-2.1 xhigh",
-            "model": "devin/swe-2-1-xhigh",
-            "effort": "xhigh",
-            "color": "#dc2626",
-        },
-        "swe-2-1-max": {
-            "label": "DV SWE-2.1 max",
-            "model": "devin/swe-2-1-max",
-            "effort": "max",
-            "color": "#dc2626",
-        },
+    DEFAULT_MODEL_BY_EFFORT: ClassVar[dict[AmpEffort, str]] = {
+        "high": "devin/deepseek-v4.1-flash-high",
+        "xhigh": "devin/swe-2-1-xhigh",
+        "max": "devin/deepseek-v4.1-flash-max",
     }
-    DEFAULT_MODEL_BY_EFFORT: ClassVar[dict[AmpEffort, AmpModel]] = {
-        "high": "deepseek-flash-high",
-        "xhigh": "swe-2-1-xhigh",
-        "max": "deepseek-flash-max",
-    }
-
-    PLUGIN_SOURCE = r'''
-// @amp-agent-mode {"key":"fh-devin-ds-high","label":"DV DS Flash 4.1 high","color":"#10b981"}
-// @amp-agent-mode {"key":"fh-devin-ds-max","label":"DV DS Flash 4.1 max","color":"#10b981"}
-// @amp-agent-mode {"key":"fh-engy-ds-high","label":"Engy DS Flash 4.1 high","color":"#0ea5e9"}
-// @amp-agent-mode {"key":"fh-engy-ds-max","label":"Engy DS Flash 4.1 max","color":"#0ea5e9"}
-// @amp-agent-mode {"key":"fh-amp-haiku-max","label":"Amp Claude Haiku 5.5 max","color":"#f97316"}
-// @amp-agent-mode {"key":"fh-devin-haiku-max","label":"DV Haiku 5.5 max","color":"#f59e0b"}
-// @amp-agent-mode {"key":"fh-devin-swe2-max","label":"DV SWE-2 max","color":"#7c3aed"}
-// @amp-agent-mode {"key":"fh-devin-swe2-high","label":"DV SWE-2 high","color":"#7c3aed"}
-// @amp-agent-mode {"key":"fh-devin-swe2-flash-max","label":"DV SWE-2 Flash max","color":"#a855f7"}
-// @amp-agent-mode {"key":"fh-devin-swe2-flash-high","label":"DV SWE-2 Flash high","color":"#a855f7"}
-// @amp-agent-mode {"key":"fh-devin-swe21-xhigh","label":"DV SWE-2.1 xhigh","color":"#dc2626"}
-// @amp-agent-mode {"key":"fh-devin-swe21-max","label":"DV SWE-2.1 max","color":"#dc2626"}
-
-import type { PluginAPI } from '@ampcode/plugin'
-
-const modes = [
-  {
-    key: 'fh-devin-ds-high',
-    label: 'DV DS Flash 4.1 high',
-    color: '#10b981',
-    agent: {
-      model: 'devin/deepseek-v4.1-flash-high',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-devin-ds-max',
-    label: 'DV DS Flash 4.1 max',
-    color: '#10b981',
-    agent: {
-      model: 'devin/deepseek-v4.1-flash-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-engy-ds-high',
-    label: 'Engy DS Flash 4.1 high',
-    color: '#0ea5e9',
-    agent: {
-      model: 'engy/deepseek-v4.1-flash-1017(high)',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-engy-ds-max',
-    label: 'Engy DS Flash 4.1 max',
-    color: '#0ea5e9',
-    agent: {
-      model: 'engy/deepseek-v4.1-flash-1017(max)',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-amp-haiku-max',
-    label: 'Amp Claude Haiku 5.5 max',
-    color: '#f97316',
-    agent: {
-      model: 'anthropic/claude-haiku-5-5',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-haiku-max',
-    label: 'DV Haiku 5.5 max',
-    color: '#f59e0b',
-    agent: {
-      model: 'devin/haiku-5-5-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-max',
-    label: 'DV SWE-2 max',
-    color: '#7c3aed',
-    agent: {
-      model: 'devin/swe-2-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-high',
-    label: 'DV SWE-2 high',
-    color: '#7c3aed',
-    agent: {
-      model: 'devin/swe-2-high',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-flash-max',
-    label: 'DV SWE-2 Flash max',
-    color: '#a855f7',
-    agent: {
-      model: 'devin/swe-2-flash-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-flash-high',
-    label: 'DV SWE-2 Flash high',
-    color: '#a855f7',
-    agent: {
-      model: 'devin/swe-2-flash-high',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-devin-swe21-xhigh',
-    label: 'DV SWE-2.1 xhigh',
-    color: '#dc2626',
-    agent: {
-      model: 'devin/swe-2-1-xhigh',
-      reasoningEffort: 'xhigh',
-    },
-  },
-  {
-    key: 'fh-devin-swe21-max',
-    label: 'DV SWE-2.1 max',
-    color: '#dc2626',
-    agent: {
-      model: 'devin/swe-2-1-max',
-      reasoningEffort: 'max',
-    },
-  },
-] as const
-
-export default function (amp: PluginAPI) {
-  for (const mode of modes) {
-    const agent = amp.createAgent({
-      extends: 'medium',
-      model: mode.model as never,
-      reasoningEffort: mode.effort,
-      display: { label: mode.label, color: mode.color },
-    })
-
-    amp.registerAgentMode({
-      key: mode.key,
-      label: mode.label,
-      description: `${mode.label} via 9Router, ${mode.effort} reasoning.`,
-      color: mode.color,
-      agent: agent.definition,
-    })
-  }
-}
-'''
-
     DEFAULT_VERSION = "latest"
     DEFAULT_SETUP_TIMEOUT_SEC = 1200.0
     SETTINGS_FILENAME = "settings.json"
-    PLUGIN_FILENAME = "fh-modes.ts"
 
     ERROR_PATTERNS = [
         *BaseInstalledAgent.ERROR_PATTERNS,
@@ -349,12 +118,23 @@ export default function (amp: PluginAPI) {
             info.model_info.provider = provider
         return info
 
+    @staticmethod
+    def _route(value: str) -> str:
+        """Reject an old-style key or an already-prefixed custom id."""
+        route = value.lower()
+        if "/" not in route or route.startswith("custom:"):
+            raise ValueError(
+                f"Amp model must be a route like devin/swe-2-1-max, got {value!r}"
+            )
+        return route
+
     def __init__(
         self,
         *args,
         effort: str | None = None,
         reasoning_effort: str | None = None,
         model: str | None = None,
+        model_id: str | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -365,18 +145,14 @@ export default function (amp: PluginAPI) {
                 f"Choose one of: {', '.join(self.DEFAULT_MODEL_BY_EFFORT)}"
             )
         self.effort: AmpEffort = cast(AmpEffort, selected)
-        selected_model = (
+        self.model: str = self._route(
             model or self.DEFAULT_MODEL_BY_EFFORT[self.effort]
-        ).lower()
-        if selected_model not in self.MODE_SPECS:
-            raise ValueError(
-                f"Unsupported Amp model {selected_model!r}. "
-                f"Choose one of: {', '.join(self.MODE_SPECS)}"
-            )
-        self.model: AmpModel = cast(AmpModel, selected_model)
+        )
+        self.model_id: str = model_id or self.model
         if self.options is not None:
             self.options.effort = self.effort
             self.options.model = self.model
+            self.options.model_id = self.model_id
 
     @override
     def version(self) -> str:
@@ -401,11 +177,7 @@ export default function (amp: PluginAPI) {
         model = (kwargs or {}).get("model") or cls.DEFAULT_MODEL_BY_EFFORT[
             cast(AmpEffort, effort_key)
         ]
-        if str(model).lower() not in cls.MODE_SPECS:
-            raise ValueError(
-                f"Unsupported Amp model {model!r}. "
-                f"Choose one of: {', '.join(cls.MODE_SPECS)}"
-            )
+        cls._route(str(model))
         if not (values.get("AMP_API_KEY") or os.environ.get("AMP_API_KEY")):
             raise ValueError(
                 "AMP_API_KEY is required for Amp headless execution. Mint an "
@@ -447,7 +219,6 @@ export default function (amp: PluginAPI) {
 
         home = await resolve_home(self, environment)
         settings_path = f"{home}/.config/amp/{self.SETTINGS_FILENAME}"
-        plugin_path = f"{home}/.config/amp/plugins/{self.PLUGIN_FILENAME}"
 
         await upload_text(
             self,
@@ -456,16 +227,7 @@ export default function (amp: PluginAPI) {
             remote_path=settings_path,
             filename=self.SETTINGS_FILENAME,
         )
-        await upload_text(
-            self,
-            environment,
-            content=self.PLUGIN_SOURCE,
-            remote_path=plugin_path,
-            filename=self.PLUGIN_FILENAME,
-        )
-        self.logger.info(
-            "Configured Amp settings and mode plugin at %s", plugin_path
-        )
+        self.logger.info("Configured Amp settings at %s", settings_path)
 
     @override
     @with_prompt_template
@@ -477,8 +239,6 @@ export default function (amp: PluginAPI) {
     ) -> None:
         _, api_key = require_env(self, "AMP_API_KEY")
         workdir = await resolve_workdir(self, environment)
-        spec = self.MODE_SPECS[self.model]
-        label = spec["label"]
         log_dir = str(self.environment_logs_dir)
         log_file = f"{log_dir}/amp.txt"
 
@@ -486,8 +246,8 @@ export default function (amp: PluginAPI) {
             "set -euo pipefail; "
             'export PATH="$HOME/.amp/bin:$PATH"; '
             f"mkdir -p {shlex.quote(log_dir)}; "
-            f"amp --model {shlex.quote(spec['model'])} "
-            f"--effort {shlex.quote(spec['effort'])} "
+            f"amp --model {shlex.quote(self.model)} "
+            f"--effort {shlex.quote(self.effort)} "
             "--stream-json "
             f"-x {shlex.quote(instruction)} "
             f"2>&1 | tee {shlex.quote(log_file)}; "
@@ -501,10 +261,9 @@ export default function (amp: PluginAPI) {
             "then echo 'Error: Connection error.' >&2; exit 1; fi"
         )
         self.logger.info(
-            "Running Amp Code with effort=%s model_key=%s mode=%s",
+            "Running Amp Code with effort=%s route=%s",
             self.effort,
             self.model,
-            label,
         )
         await self.exec_as_agent(
             environment,
@@ -520,12 +279,11 @@ export default function (amp: PluginAPI) {
             context.n_input_tokens, context.n_output_tokens, context.n_cache_tokens = (
                 usage
             )
-        spec = self.MODE_SPECS[self.model]
         context.metadata = {
             **(context.metadata or {}),
             "harness": "amp-code",
             "effort": self.effort,
-            "mode": spec["label"],
-            "model": spec["model"],
+            "model": self.model,
             "model_key": self.model,
+            "model_id": self.model_id,
         }

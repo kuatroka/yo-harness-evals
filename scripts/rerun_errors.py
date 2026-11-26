@@ -35,7 +35,11 @@ sys.path.insert(0, str(ROOT / "bench"))
 import lib  # noqa: E402
 
 DEFAULT_TASKS = "alacritty__alacritty-3921,burntsushi__ripgrep-2555"
-DEFAULT_MODELS = "swe-2-max,swe-2-flash-max,deepseek-engy-max"
+DEFAULT_MODELS = (
+    "9r/dv-bridge/swe-2-max,"
+    "9r/dv-bridge/swe-2-flash-max,"
+    "9r/engy/deepseek-4-1-flash-1017-max"
+)
 DEFAULT_HARNESSES = "droid,amp,claude"
 ARCHIVE = ROOT / "archive" / "reruns"
 
@@ -59,18 +63,31 @@ def read_jobs(models: dict) -> dict[str, dict]:
             data = json.loads(result_path.read_text())
             config_agent = (data.get("config") or {}).get("agent") or {}
             agent_info = data.get("agent_info") or {}
+            kwargs = config_agent.get("kwargs") or {}
+            if not isinstance(kwargs, dict):
+                kwargs = {}
             harness = lib.HARNESS_ALIASES.get(
                 agent_info.get("name")
             ) or lib.HARNESS_ALIASES.get(config_agent.get("name"))
             observed = (agent_info.get("model_info") or {}).get(
                 "name"
             ) or config_agent.get("model_name")
+            effort = kwargs.get("effort") or kwargs.get("reasoning_effort")
+            recorded_id = kwargs.get("model_id")
             trials.append(
                 {
                     "dir": result_path.parent.name,
                     "task": (data.get("task_name") or "").split("/")[-1],
                     "harness": harness,
-                    "model": lib.resolve_model(observed, models),
+                    "model": (
+                        recorded_id
+                        if isinstance(recorded_id, str) and recorded_id in models
+                        else lib.resolve_model(
+                            observed,
+                            models,
+                            effort if isinstance(effort, str) else None,
+                        )
+                    ),
                     "exception": (data.get("exception_info") or {}).get(
                         "exception_type"
                     ),
@@ -95,7 +112,7 @@ def latest_job(jobs: dict[str, dict], harness: str, model: str, tasks: list[str]
 
 
 def rerun(harness: str, model: str, task: str, *, dry_run: bool) -> Path | None:
-    run_id = f"rerun-{harness}-{model}-{datetime.datetime.now():%H%M%S}"
+    run_id = f"rerun-{harness}-{lib.slug(model)}-{datetime.datetime.now():%H%M%S}"
     env = dict(os.environ)
     env.update(
         DATASET=str(ROOT / "datasets" / "bench-fast"),

@@ -198,7 +198,12 @@ def _candidates_from_job(
 
     agent = _harness_from_agent_name(first_agent.get("name"))
     effort = _first_text(kwargs.get("effort"), kwargs.get("reasoning_effort"))
-    model = _model_for_route(first_agent.get("model_name"), effort, registry)
+    recorded_id = kwargs.get("model_id")
+    model = (
+        recorded_id
+        if isinstance(recorded_id, str) and registry.get(recorded_id) is not None
+        else _model_for_route(first_agent.get("model_name"), effort, registry)
+    )
     if effort is None and model is not None:
         entry = registry.get(model)
         effort = entry.effort if entry is not None else None

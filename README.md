@@ -6,23 +6,26 @@ Local [Frontier Harness](https://frontierharness.org/evaluate-your-own-harness/)
 |---|---|---|
 | Factory Droid | `harnesses.droid:DroidAgent` | 9Router over `host.docker.internal:20128` |
 | Amp Code | `harnesses.amp:AmpAgent` | 9Router through Amp's server-side connection |
-| Claude Code | `harnesses.claude:ClaudeCodeAgent` | 9Router Anthropic endpoint through the identity shim, or Anthropic direct for `haiku-anthropic-direct` |
+| Claude Code | `harnesses.claude:ClaudeCodeAgent` | 9Router Anthropic endpoint through the identity shim, or Anthropic direct for `native/claude/haiku-5-5-*` |
 | Codex | Harbor's `codex` agent with `bench/config/codex-base.toml` | 9Router OpenAI-compatible endpoint (`cx/…`) |
 
-Model keys are `swe-2-max`, `swe-2-flash-max`, `swe-2-1-xhigh`, `swe-2-1-max`, `deepseek-engy-max`, `haiku-devin-max`, `haiku-amp-native` and `haiku-anthropic-direct`. A Devin route encodes effort in the model ID. A direct Anthropic id carries none, so `run_matrix.sh` passes `reasoning_effort` from the registry and the adapter launches the CLI with `--effort max`; without that flag the model runs at its default level. Droid relies on the custom model ID, which spells the effort; Amp passes `--model` plus `--effort max`. A model label carries effort only when the route encodes it: the jobs table turns a trailing `-max` into `(max)` (`viewer_overlay/display.py`), and a direct Anthropic id has no suffix. For those rows read the trial's `reasoning_effort`, which the Claude adapter also copies into agent metadata as `effort`.
+Model ids are `<transport>/<endpoint>/<model>-<effort>`, for example `9r/dv-bridge/swe-2-1-max`, `9r/engy/deepseek-4-1-flash-1017-max`, `native/amp/haiku-5-5-max` and `native/claude/haiku-5-5-xhigh`. `transport` is `9r`, `native` or `direct`; `endpoint` is the billing path; the last segment is the model plus effort, with dots spelled as hyphens. The harness is a separate registry field, so one route keeps one id across Droid, Amp, Claude and Codex. Slashes are for config, display and joins only: a job folder flattens them to hyphens (`9r-dv-bridge-swe-2-1-max`) and the slash id never becomes a path. A Devin route encodes effort in its route id; a native Anthropic id does not, so `run_matrix.sh` passes `reasoning_effort` for those rows. Droid writes the id as its custom-model label; Amp passes the route with `--model` and the level with `--effort`.
 
-| Key | Model id | Served by |
+| Id | Route | Served by |
 |---|---|---|
-| `swe-2-max` | `devin/swe-2-max` | local Devin bridge |
-| `swe-2-flash-max` | `devin/swe-2-flash-max` | local Devin bridge |
-| `swe-2-1-xhigh` | `devin/swe-2-1-xhigh` | local Devin bridge, Droid, Amp, Claude, Codex |
-| `swe-2-1-max` | `devin/swe-2-1-max` | local Devin bridge, Droid, Amp, Claude, Codex |
-| `deepseek-engy-max` | `engy/deepseek-v4.1-flash-1017(max)` | Engy, direct from 9Router |
-| `haiku-devin-max` | `devin/haiku-5-5-max` | local Devin bridge, Droid's only Haiku 5.5 route (paused: Devin weekly quota) |
-| `haiku-amp-native` | `anthropic/claude-haiku-5-5` | Amp's own Claude access, no 9Router |
-| `haiku-anthropic-direct` | `claude-haiku-5-5` | Claude Code's own subscription token, Anthropic direct |
+| `9r/dv-bridge/swe-2-max` | `devin/swe-2-max` | local Devin bridge |
+| `9r/dv-bridge/swe-2-flash-max` | `devin/swe-2-flash-max` | local Devin bridge |
+| `9r/dv-bridge/swe-2-1-xhigh` | `devin/swe-2-1-xhigh` | local Devin bridge, Droid, Amp, Claude, Codex |
+| `9r/dv-bridge/swe-2-1-max` | `devin/swe-2-1-max` | local Devin bridge, Droid, Amp, Claude, Codex |
+| `9r/engy/deepseek-4-1-flash-1017-max` | `engy/deepseek-v4.1-flash-1017(max)` | Engy, direct from 9Router |
+| `9r/cx/gpt-6-luna-max` | `cx/gpt-6-luna(max)` | cx through 9Router |
+| `9r/dv-bridge/haiku-5-5-max` | `devin/haiku-5-5-max` | local Devin bridge, Droid's only Haiku 5.5 route |
+| `native/amp/haiku-5-5-max` | `anthropic/claude-haiku-5-5` | Amp's own Claude access, no 9Router |
+| `native/claude/haiku-5-5-max` | `claude-haiku-5-5` | Claude Code's own subscription token, Anthropic direct |
 
-**Anthropic models go to the harness's own access first.** For fable, opus, sonnet or haiku, the default is the route the harness ships with. Claude Code uses the subscription token from the host keychain, straight to `api.anthropic.com`, with no shim and no 9Router. Droid has no Anthropic access of its own on this account: its catalog has no Haiku 5.5 and Factory inference answers 402 `no_active_subscription`, so the Droid Haiku row is the Devin bridge and inherits that route's quota risk. Amp uses its own Claude models, `anthropic/claude-haiku-5-5` and the rest, with `--effort max` on the CLI and `reasoningEffort` in the mode definition Amp's plugin API documents. Route an Anthropic model through 9Router or the Devin bridge only when that route is asked for explicitly; a bridged Anthropic model still gets its own registry row, so the results show which endpoint produced the score.
+`9r/dv-bridge/haiku-5-5-xhigh` stays in the registry for four archived trials and routes to no harness. `native/claude/haiku-5-5-xhigh` shares the native Claude route and carries the effort only in the registry row.
+
+**Anthropic models go to the harness's own access first.** For fable, opus, sonnet or haiku, the default is the route the harness ships with. Claude Code uses the subscription token from the host keychain, straight to `api.anthropic.com`, with no shim and no 9Router. Droid has no Anthropic access of its own on this account: its catalog has no Haiku 5.5 and Factory inference answers 402 `no_active_subscription`, so the Droid Haiku row is the Devin bridge and inherits that route's quota risk. Amp uses its own Claude models, `anthropic/claude-haiku-5-5` and the rest, with `--model` and `--effort max` on the CLI. Route an Anthropic model through 9Router or the Devin bridge only when that route is asked for explicitly; a bridged Anthropic model still gets its own registry row, so the results show which endpoint produced the score.
 
 ## Setup
 
@@ -36,7 +39,7 @@ uv run harbor download frontier-harness-eval/frontier-harness-eval@v1.1.0 --expo
 
 `.env` needs `NINEROUTER_API_KEY` for Droid and for Claude Code when it runs through the shim. Amp needs `AMP_API_KEY` (an `sgamp_` access token). Claude Code on an Anthropic model uses the host's own Claude Code login instead, read from the macOS keychain, so no key goes in `.env` for that route. Droid uses `FACTORY_API_KEY` when set and otherwise copies the host login from `~/.factory`. Task images must be glibc based; Alpine and musl are refused.
 
-Two model routes are separate services, not code in this repo. 9Router answers on `host.docker.internal:20128` and the Devin bridge on `20130`; `bench/config/models.json` records which model keys need each one. Both must be running before a job names them. The only shim here is `scripts/claude_identity_shim.py`, which `run_matrix.sh` starts on `20140` and stops afterward. Nothing in this repository vendors 9Router or the Devin bridge.
+Two model routes are separate services, not code in this repo. 9Router answers on `host.docker.internal:20128` and the Devin bridge on `20130`; `bench/config/models.json` records which model ids need each one. Both must be running before a job names them. The only shim here is `scripts/claude_identity_shim.py`, which `run_matrix.sh` starts on `20140` and stops afterward. Nothing in this repository vendors 9Router or the Devin bridge.
 
 ## Run
 
@@ -52,10 +55,10 @@ Fast hard-task pilot, about 15 minutes of agent time per attempt:
 
 ```bash
 TASKS=fix-code-vulnerability,cancel-async-tasks,sparql-university \
-MODELS=swe-2-max,swe-2-flash-max HARNESSES=droid,amp,claude ./scripts/run_matrix.sh
+MODELS=9r/dv-bridge/swe-2-max,9r/dv-bridge/swe-2-flash-max HARNESSES=droid,amp,claude ./scripts/run_matrix.sh
 ```
 
-Add `claude` to `HARNESSES` deliberately. It installs the CLI in the container with apt and bun. Requests to a non-Anthropic model go through `scripts/claude_identity_shim.py` on port 20140, which the matrix starts and stops on its own. The shim removes the three paragraphs of Claude Code's prompt that Devin's content policy rejects and forwards everything else untouched. On an Anthropic model the CLI talks to `api.anthropic.com` with the host's token and no shim, per the routing rule above. Effort comes from the model ID rather than a kwarg, so the matrix runs `scripts/backfill_metadata.py` afterward to record it for the viewer.
+Add `claude` to `HARNESSES` deliberately. It installs the CLI in the container with apt and bun. Requests to a non-Anthropic model go through `scripts/claude_identity_shim.py` on port 20140, which the matrix starts and stops on its own. The shim removes the three paragraphs of Claude Code's prompt that Devin's content policy rejects and forwards everything else untouched. On an Anthropic model the CLI talks to `api.anthropic.com` with the host's token and no shim, per the routing rule above. Effort comes from the model's registry row; `run_matrix.sh` passes it as `reasoning_effort` and runs `scripts/backfill_metadata.py` afterward so the viewer shows it on trials whose adapter does not record the kwarg.
 
 ## Reading the results
 
@@ -102,7 +105,7 @@ For a comparison that scales past a handful of models, use `bench/`. Registries 
 
 The overlay in `viewer_overlay/` imports Harbor's own `create_app` and splices its routes in front of the SPA fallback. It serves `/launch` for a new run or a rerun, and rewrites agent names, model labels and token totals in API responses. Nothing under `site-packages` is edited, so a Harbor upgrade cannot revert it.
 
-`/launch` picks a dataset, a harness, a model key that harness can route, an effort and one or more tasks. A rerun prefills from the source job's `config.json`, including the dataset that job used, and reports every field it cannot resolve instead of guessing. Launching shells out to `scripts/run_matrix.sh`, the same path a terminal run takes.
+`/launch` picks a dataset, a harness, a model id that harness can route, an effort and one or more tasks. A rerun prefills from the source job's `config.json`, including the dataset that job used, and reports every field it cannot resolve instead of guessing. Launching shells out to `scripts/run_matrix.sh`, the same path a terminal run takes.
 
 The Total column is a string patch on Harbor's compiled bundle. The overlay applies it to its own copy in `.viewer_static/` while it builds, so a Harbor upgrade only changes the bytes it copies. `tests/test_harbor_upgrade_guard.py` fails when the install is not pristine or when the built copy loses the column, and `viewer_overlay/columns.py` raises at startup when the bundle changes shape.
 

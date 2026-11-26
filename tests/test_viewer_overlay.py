@@ -45,7 +45,7 @@ class ValidationTest(unittest.TestCase):
     def resolve(self, **overrides: Any) -> launch.Resolution:
         candidates: dict[str, Any] = {
             "agent": "codex",
-            "model": "swe-2-1-max",
+            "model": "9r/dv-bridge/swe-2-1-max",
             "effort": "max",
             "tasks": ["wal-recovery-ordering"],
         }
@@ -75,8 +75,12 @@ class ValidationTest(unittest.TestCase):
         self.assertProblem(self.resolve(model="gpt-99"), "model", "gpt-99")
 
     def test_model_that_does_not_route_the_agent(self):
-        # haiku-devin-max is droid-only in the registry.
-        self.assertProblem(self.resolve(agent="claude", model="haiku-devin-max"), "model", "route")
+        # The Devin Haiku row is droid-only in the registry.
+        self.assertProblem(
+            self.resolve(agent="claude", model="9r/dv-bridge/haiku-5-5-max"),
+            "model",
+            "route",
+        )
 
     def test_unknown_effort(self):
         self.assertProblem(self.resolve(effort="turbo"), "effort", "turbo")
@@ -176,10 +180,44 @@ class RerunTest(unittest.TestCase):
             resolution = launch.resolve_from_job(job, self.reg, self.datasets, job.name)
         self.assertEqual(resolution.unresolved, ())
         assert resolution.spec is not None
-        self.assertEqual(resolution.spec.model, "swe-2-max")
-        entry = self.reg.get("swe-2-max")
+        self.assertEqual(
+            resolution.spec.model, "9r/dv-bridge/swe-2-max"
+        )
+        entry = self.reg.get("9r/dv-bridge/swe-2-max")
         assert entry is not None
         self.assertEqual(entry.route, "devin/swe-2-max")
+
+    def test_a_recorded_model_id_beats_the_shared_route(self):
+        """A native Claude id carries no effort, so the stored id must win."""
+        with tempfile.TemporaryDirectory() as tmp:
+            job = Path(tmp) / "recorded-id-job"
+            job.mkdir()
+            (job / "config.json").write_text(
+                json.dumps(
+                    {
+                        "agents": [
+                            {
+                                "name": "harnesses.claude:ClaudeCodeAgent",
+                                "model_name": "claude-haiku-5-5",
+                                "kwargs": {
+                                    "model_id": "native/claude/haiku-5-5-xhigh"
+                                },
+                            }
+                        ],
+                        "datasets": [
+                            {
+                                "path": str(self.datasets / "frontier-harness-eval"),
+                                "task_names": ["wal-recovery-ordering"],
+                            }
+                        ],
+                    }
+                )
+            )
+            resolution = launch.resolve_from_job(job, self.reg, self.datasets, job.name)
+        self.assertEqual(resolution.unresolved, ())
+        assert resolution.spec is not None
+        self.assertEqual(resolution.spec.model, "native/claude/haiku-5-5-xhigh")
+        self.assertEqual(resolution.spec.effort, "xhigh")
 
 
 class RegistryTest(unittest.TestCase):
@@ -204,7 +242,10 @@ class RegistryTest(unittest.TestCase):
             assert entry is not None
             self.assertEqual(self.cli(key, "route").stdout.strip(), entry.route)
             self.assertEqual(self.cli(key, "effort").stdout.strip(), entry.effort)
-        for key, agent in (("swe-2-1-max", "codex"), ("haiku-devin-max", "claude")):
+        for key, agent in (
+            ("9r/dv-bridge/swe-2-1-max", "codex"),
+            ("9r/dv-bridge/haiku-5-5-max", "claude"),
+        ):
             supported = self.cli(key, "supports", agent).returncode == 0
             self.assertEqual(supported, reg.supports(key, agent))
 
@@ -224,7 +265,7 @@ class RunnerTest(unittest.TestCase):
         make_dataset(self.root / "datasets")
         self.spec = launch.LaunchSpec(
             agent="codex",
-            model="swe-2-1-max",
+            model="9r/dv-bridge/swe-2-1-max",
             effort="max",
             tasks=("wal-recovery-ordering", "adaptive-rejection-sampler"),
             n_concurrent=3,
@@ -243,7 +284,7 @@ class RunnerTest(unittest.TestCase):
         expected = [
             f"JOB_PREFIX=ui-{started.launch_id}",
             "HARNESSES=codex",
-            "MODELS=swe-2-1-max",
+            "MODELS=9r/dv-bridge/swe-2-1-max",
             "EFFORTS=max",
             "TASKS=wal-recovery-ordering,adaptive-rejection-sampler",
             "ATTEMPTS=4",
@@ -635,19 +676,25 @@ class AppRoutesTest(unittest.TestCase):
         for model in payload["models"]:
             self.assertTrue(model["route"], model)
             self.assertTrue(model["provider"], model)
+            self.assertTrue(model["label"], model)
+            self.assertIn(model["transport"], ("9r", "native", "direct"))
         by_key = {model["key"]: model for model in payload["models"]}
         self.assertEqual(
-            sorted(by_key["swe-2-1-max"]["harnesses"]), ["amp", "claude", "codex", "droid"]
+            sorted(by_key["9r/dv-bridge/swe-2-1-max"]["harnesses"]),
+            ["amp", "claude", "codex", "droid"],
+        )
+        self.assertEqual(
+            by_key["9r/dv-bridge/swe-2-1-max"]["label"], "swe-2-1-max"
         )
         # A retired row stays resolvable for archived trials, and routes to nobody.
-        self.assertEqual(by_key["haiku-anthropic-direct"]["harnesses"], [])
-        self.assertIn("swe-2-1-max", by_key)
+        self.assertEqual(by_key["9r/dv-bridge/haiku-5-5-xhigh"]["harnesses"], [])
+        self.assertIn("9r/dv-bridge/swe-2-1-max", by_key)
 
     def test_an_unresolvable_launch_answers_409_with_the_partial_spec(self):
         response = self.post_launch(
             {
                 "agent": "codex",
-                "model": "swe-2-1-max",
+                "model": "9r/dv-bridge/swe-2-1-max",
                 "effort": "max",
                 "tasks": ["no-such-task"],
             }
@@ -663,7 +710,7 @@ class AppRoutesTest(unittest.TestCase):
         response = self.post_launch(
             {
                 "agent": "codex",
-                "model": "swe-2-1-max",
+                "model": "9r/dv-bridge/swe-2-1-max",
                 "effort": "max",
                 "tasks": ["wal-recovery-ordering"],
                 "n_concurrent": 1,
@@ -687,7 +734,9 @@ class AppRoutesTest(unittest.TestCase):
         self.assertEqual(listed["launch_id"], created["launch_id"])
         self.assertEqual(listed["status"], "pending")
         self.assertEqual(listed["jobs"], [])
-        self.assertEqual(listed["spec"]["model"], "swe-2-1-max")
+        self.assertEqual(
+            listed["spec"]["model"], "9r/dv-bridge/swe-2-1-max"
+        )
         self.assertEqual(listed["spec"]["tasks"], ["wal-recovery-ordering"])
 
     def test_a_job_spec_is_derived_from_its_config(self):
@@ -696,7 +745,9 @@ class AppRoutesTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["unresolved"], [])
         self.assertEqual(payload["spec"]["agent"], "codex")
-        self.assertEqual(payload["spec"]["model"], "swe-2-1-max")
+        self.assertEqual(
+            payload["spec"]["model"], "9r/dv-bridge/swe-2-1-max"
+        )
         self.assertEqual(payload["spec"]["tasks"], ["wal-recovery-ordering"])
         self.assertEqual(payload["spec"]["from_job"], "fixture-job")
 

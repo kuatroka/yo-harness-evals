@@ -1,4 +1,4 @@
-"""Per-task dump for the two signal tasks, grouped by model key and harness."""
+"""Per-task dump for the two signal tasks, grouped by model id and harness."""
 
 from __future__ import annotations
 

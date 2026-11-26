@@ -9,11 +9,11 @@
   },
   "amp": {
     "agent": "amp",
-    "model_id_template": "{key}",
+    "model_id_template": "{route}",
     "max_concurrency": 2,
-    "effort_syntax": "mode-label",
+    "effort_syntax": "flag",
     "requires_shim": false,
-    "notes": "Amp picks its mode by label, so MODEL_IDS and the uploaded plugin must agree."
+    "notes": "Amp takes --model <route> and --effort <level>; no plugin and no mode label."
   },
   "claude": {
     "agent": "claude-code",

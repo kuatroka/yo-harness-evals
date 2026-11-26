@@ -42,45 +42,60 @@ class ResolveModelTest(unittest.TestCase):
     def setUp(self):
         self.models = lib.load_config("models")
 
-    def test_maps_every_route(self):
-        # A paused row (empty harnesses) defers to an enabled row on the same
-        # route. Effort variants that share one physical model id also share a
-        # route (claude-haiku-5-5 carries no effort), so several enabled rows
-        # may resolve to the first enabled match.
-        first_enabled: dict[str, str] = {}
-        for key, spec in self.models.items():
-            if spec.get("harnesses") and spec["route"] not in first_enabled:
-                first_enabled[spec["route"]] = key
+    def test_maps_every_route_and_effort(self):
         for key, spec in self.models.items():
             with self.subTest(key=key):
-                resolved = lib.resolve_model(spec["route"], self.models)
-                self.assertIsNotNone(resolved)
-                if spec.get("harnesses"):
-                    self.assertEqual(resolved, first_enabled[spec["route"]])
+                self.assertEqual(
+                    lib.resolve_model(spec["route"], self.models, spec["effort"]),
+                    key,
+                )
 
-    def test_paused_row_resolves_to_the_enabled_row(self):
-        # haiku-anthropic-direct is retired (empty harnesses); the haiku-5.5-*
-        # rows now own the native Anthropic route for Claude Code.
+    def test_effort_breaks_a_shared_route_tie(self):
         self.assertEqual(
-            lib.resolve_model("claude-haiku-5-5", self.models), "haiku-5.5-max"
+            lib.resolve_model("claude-haiku-5-5", self.models, "max"),
+            "native/claude/haiku-5-5-max",
+        )
+        self.assertEqual(
+            lib.resolve_model("claude-haiku-5-5", self.models, "xhigh"),
+            "native/claude/haiku-5-5-xhigh",
         )
 
+    def test_an_unknown_effort_does_not_match_a_shared_route(self):
+        self.assertIsNone(lib.resolve_model("claude-haiku-5-5", self.models, "turbo"))
+
     def test_strips_custom_prefix_and_dv_alias(self):
-        self.assertEqual(lib.resolve_model("custom:devin/swe-2-max", self.models), "swe-2-max")
-        self.assertEqual(lib.resolve_model("dv/swe-2-max", self.models), "swe-2-max")
+        self.assertEqual(
+            lib.resolve_model("custom:devin/swe-2-max", self.models),
+            "9r/dv-bridge/swe-2-max",
+        )
+        self.assertEqual(
+            lib.resolve_model("dv/swe-2-max", self.models),
+            "9r/dv-bridge/swe-2-max",
+        )
 
     def test_model_cap_narrows_concurrency(self):
-        registry = {"swe-2-max": {"max_concurrency": 2, "harnesses": ["droid"]}}
+        registry = {
+            "9r/dv-bridge/swe-2-max": {
+                "max_concurrency": 2,
+                "harnesses": ["droid"],
+            }
+        }
         caps = {"droid": {"max_concurrency": 8}}
         self.assertEqual(
-            plan.concurrency_cap(["droid"], ["swe-2-max"], registry, caps), 2
+            plan.concurrency_cap(
+                ["droid"], ["9r/dv-bridge/swe-2-max"], registry, caps
+            ),
+            2,
         )
 
     def test_harness_cap_narrows_concurrency(self):
-        registry = {"swe-2-max": {"harnesses": ["droid"]}}
+        registry = {"9r/dv-bridge/swe-2-max": {"harnesses": ["droid"]}}
         caps = {"droid": {"max_concurrency": 2}, "amp": {"max_concurrency": 6}}
         self.assertEqual(
-            plan.concurrency_cap(["droid", "amp"], ["swe-2-max"], registry, caps), 2
+            plan.concurrency_cap(
+                ["droid", "amp"], ["9r/dv-bridge/swe-2-max"], registry, caps
+            ),
+            2,
         )
 
     def test_unknown_route_stays_unknown(self):
@@ -213,13 +228,17 @@ class ModelRegistryTest(unittest.TestCase):
         import contextlib, io
 
         for key, field, expected in (
-            ("swe-2-max", "route", "devin/swe-2-max"),
-            ("swe-2-max", "effort", "max"),
-            ("swe-2-1-xhigh", "route", "devin/swe-2-1-xhigh"),
-            ("swe-2-1-xhigh", "effort", "xhigh"),
-            ("swe-2-1-max", "route", "devin/swe-2-1-max"),
-            ("swe-2-1-max", "effort", "max"),
-            ("deepseek-engy-max", "route", "engy/deepseek-v4.1-flash-1017(max)"),
+            ("9r/dv-bridge/swe-2-max", "route", "devin/swe-2-max"),
+            ("9r/dv-bridge/swe-2-max", "effort", "max"),
+            ("9r/dv-bridge/swe-2-1-xhigh", "route", "devin/swe-2-1-xhigh"),
+            ("9r/dv-bridge/swe-2-1-xhigh", "effort", "xhigh"),
+            ("9r/dv-bridge/swe-2-1-max", "route", "devin/swe-2-1-max"),
+            ("9r/dv-bridge/swe-2-1-max", "effort", "max"),
+            (
+                "9r/engy/deepseek-4-1-flash-1017-max",
+                "route",
+                "engy/deepseek-v4.1-flash-1017(max)",
+            ),
         ):
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
@@ -236,30 +255,30 @@ class ModelRegistryTest(unittest.TestCase):
         # Each harness reaches Anthropic through its own access, so the registry,
         # not the harness default route, decides whether a pair may run.
         cases = (
-            # Retired in favor of haiku-5.5-max/-xhigh: it resolves for archived
-            # trials but no harness may launch it now.
-            ("haiku-anthropic-direct", "claude", 1),
-            ("haiku-5.5-max", "claude", 0),
-            ("haiku-5.5-xhigh", "claude", 0),
-            ("haiku-5.5-max", "amp", 1),
-            ("haiku-amp-native", "amp", 0),
-            ("haiku-amp-native", "claude", 1),
-            ("deepseek-engy-max", "droid", 0),
-            ("deepseek-engy-max", "amp", 0),
-            ("deepseek-engy-max", "claude", 0),
+            # An archived route with no harnesses still resolves for display but
+            # may not launch anywhere.
+            ("9r/dv-bridge/haiku-5-5-xhigh", "claude", 1),
+            ("native/claude/haiku-5-5-max", "claude", 0),
+            ("native/claude/haiku-5-5-xhigh", "claude", 0),
+            ("native/claude/haiku-5-5-max", "amp", 1),
+            ("native/amp/haiku-5-5-max", "amp", 0),
+            ("native/amp/haiku-5-5-max", "claude", 1),
+            ("9r/engy/deepseek-4-1-flash-1017-max", "droid", 0),
+            ("9r/engy/deepseek-4-1-flash-1017-max", "amp", 0),
+            ("9r/engy/deepseek-4-1-flash-1017-max", "claude", 0),
             # Droid reaches Haiku through the Devin bridge now that quota is
             # back; other harnesses still can't run it.
-            ("haiku-devin-max", "droid", 0),
-            ("haiku-devin-max", "amp", 1),
+            ("9r/dv-bridge/haiku-5-5-max", "droid", 0),
+            ("9r/dv-bridge/haiku-5-5-max", "amp", 1),
             # swe-2.1 runs on all four harnesses through the Devin bridge.
-            ("swe-2-1-xhigh", "droid", 0),
-            ("swe-2-1-xhigh", "amp", 0),
-            ("swe-2-1-xhigh", "claude", 0),
-            ("swe-2-1-xhigh", "codex", 0),
-            ("swe-2-1-max", "droid", 0),
-            ("swe-2-1-max", "amp", 0),
-            ("swe-2-1-max", "claude", 0),
-            ("swe-2-1-max", "codex", 0),
+            ("9r/dv-bridge/swe-2-1-xhigh", "droid", 0),
+            ("9r/dv-bridge/swe-2-1-xhigh", "amp", 0),
+            ("9r/dv-bridge/swe-2-1-xhigh", "claude", 0),
+            ("9r/dv-bridge/swe-2-1-xhigh", "codex", 0),
+            ("9r/dv-bridge/swe-2-1-max", "droid", 0),
+            ("9r/dv-bridge/swe-2-1-max", "amp", 0),
+            ("9r/dv-bridge/swe-2-1-max", "claude", 0),
+            ("9r/dv-bridge/swe-2-1-max", "codex", 0),
         )
         for key, harness, expected in cases:
             with self.subTest(key=key, harness=harness):
@@ -291,14 +310,14 @@ class CostTest(unittest.TestCase):
             tokens_out=100_000,
         )
         # 0.5M fresh at 3.00, 0.5M cached at 0.30, 0.1M out at 15.00. The live
-        # registry has swe-2-max inside a free window, so strip it for the
-        # arithmetic check rather than depend on the calendar.
-        models["swe-2-max"]["pricing"].pop("free_until", None)
+        # registry has 9r/dv-bridge/swe-2-max inside a free window, so strip it
+        # for the arithmetic check rather than depend on the calendar.
+        models["9r/dv-bridge/swe-2-max"]["pricing"].pop("free_until", None)
         self.assertAlmostEqual(lib.list_cost(priced, models), 3.15, places=4)
 
     def test_free_window_makes_the_real_cost_zero(self):
         models = lib.load_config("models")
-        models["swe-2-max"]["pricing"]["free_until"] = "2999-01-01T00:00:00Z"
+        models["9r/dv-bridge/swe-2-max"]["pricing"]["free_until"] = "2999-01-01T00:00:00Z"
         trial = lib.Trial(
             job="job", harness="droid", model="devin/swe-2-max", task="t",
             reward=1.0, timed_out=False, duration_min=3.0, finished=True,
@@ -308,7 +327,7 @@ class CostTest(unittest.TestCase):
 
     def test_expired_free_window_prices_normally(self):
         models = lib.load_config("models")
-        models["swe-2-max"]["pricing"]["free_until"] = "2000-01-01T00:00:00Z"
+        models["9r/dv-bridge/swe-2-max"]["pricing"]["free_until"] = "2000-01-01T00:00:00Z"
         trial = lib.Trial(
             job="job", harness="droid", model="devin/swe-2-max", task="t",
             reward=1.0, timed_out=False, duration_min=3.0, finished=True,
@@ -338,12 +357,32 @@ class PlanTest(unittest.TestCase):
         return code, out.getvalue()
 
     def test_rejects_a_route_that_does_not_exist_for_the_harness(self):
-        code, out = self.run_plan(["--models", "haiku-devin-max", "--harnesses", "claude", "--tasks", "regex-log"])
+        code, out = self.run_plan(
+            [
+                "--models",
+                "9r/dv-bridge/haiku-5-5-max",
+                "--harnesses",
+                "claude",
+                "--tasks",
+                "regex-log",
+            ]
+        )
         self.assertEqual(code, 2)
         self.assertIn("not supported on claude", out)
 
     def test_builds_a_command_with_the_narrowest_cap(self):
-        code, out = self.run_plan(["--models", "swe-2-max", "--harnesses", "droid,amp", "--tasks", "regex-log", "--attempts", "2"])
+        code, out = self.run_plan(
+            [
+                "--models",
+                "9r/dv-bridge/swe-2-max",
+                "--harnesses",
+                "droid,amp",
+                "--tasks",
+                "regex-log",
+                "--attempts",
+                "2",
+            ]
+        )
         self.assertEqual(code, 0)
         self.assertIn("CONCURRENCY=2", out)
         self.assertIn("ATTEMPTS=2", out)
@@ -356,7 +395,9 @@ class PlanTest(unittest.TestCase):
             for name, entry in manifest["tasks"].items()
             if entry.get("tier") == "fast" and entry.get("discriminates")
         )
-        code, out = self.run_plan(["--models", "swe-2-max", "--tier", "fast", "--discriminating"])
+        code, out = self.run_plan(
+            ["--models", "9r/dv-bridge/swe-2-max", "--tier", "fast", "--discriminating"]
+        )
         if not expected:
             self.assertEqual(code, 2)
             self.assertIn("no tasks selected", out)
