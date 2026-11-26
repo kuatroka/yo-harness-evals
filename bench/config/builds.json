@@ -1,0 +1,30 @@
+{
+  "alacritty__alacritty-3921": {
+    "checked_at": "2026-11-21T01:50:00+00:00",
+    "seconds": 0.0,
+    "status": "ok"
+  },
+  "burntsushi__ripgrep-1065": {
+    "checked_at": "2026-11-21T02:06:00+00:00",
+    "seconds": 0.0,
+    "status": "failed",
+    "tail": [
+      "error: rustc 1.85.0 is not supported by the following packages"
+    ]
+  },
+  "burntsushi__ripgrep-2555": {
+    "checked_at": "2026-11-21T01:55:00+00:00",
+    "seconds": 0.0,
+    "status": "ok"
+  },
+  "burntsushi__ripgrep-2576": {
+    "checked_at": "2026-11-21T02:06:00+00:00",
+    "seconds": 0.0,
+    "status": "ok"
+  },
+  "burntsushi__ripgrep-2609": {
+    "checked_at": "2026-11-21T02:06:00+00:00",
+    "seconds": 0.0,
+    "status": "ok"
+  }
+}

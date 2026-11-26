@@ -1,0 +1,34 @@
+{
+  "droid": {
+    "agent": "droid",
+    "model_id_template": "custom:{route}",
+    "max_concurrency": 2,
+    "effort_syntax": "route-suffix",
+    "requires_shim": false,
+    "notes": "Devin bridge caps swe-2 at two concurrent calls, so Droid never runs wider than two trials."
+  },
+  "amp": {
+    "agent": "amp",
+    "model_id_template": "{key}",
+    "max_concurrency": 2,
+    "effort_syntax": "mode-label",
+    "requires_shim": false,
+    "notes": "Amp picks its mode by label, so MODEL_IDS and the uploaded plugin must agree."
+  },
+  "claude": {
+    "agent": "claude-code",
+    "model_id_template": "{route}",
+    "max_concurrency": 2,
+    "effort_syntax": "route-suffix",
+    "requires_shim": true,
+    "notes": "Traffic goes through the identity shim on 20140 so Devin accepts the request."
+  },
+  "codex": {
+    "agent": "codex",
+    "model_id_template": "{route}",
+    "max_concurrency": 2,
+    "effort_syntax": "route-suffix",
+    "requires_shim": false,
+    "notes": "OpenAI Codex CLI. Takes --model and -c model_reasoning_effort; 9Router OpenAI-compatible endpoint."
+  }
+}

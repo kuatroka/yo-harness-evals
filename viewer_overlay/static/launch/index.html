@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New run · Harbor overlay</title>
+    <link rel="stylesheet" href="/launch/launch.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="masthead">
+        <div>
+          <h1>New run</h1>
+          <p class="lede">
+            Starts <code>scripts/run_matrix.sh</code> on the route the registry gives
+            the model you pick. The job lands in <code>jobs/</code> and shows up in the
+            viewer.
+          </p>
+        </div>
+        <a class="back" href="/">Back to the viewer</a>
+      </header>
+
+      <section class="card">
+        <form id="spec-form" novalidate>
+          <div class="grid">
+            <label>
+              Dataset
+              <select id="dataset" name="dataset" required></select>
+            </label>
+            <label>
+              Agent
+              <select id="agent" name="agent" required></select>
+            </label>
+            <label>
+              Model
+              <select id="model" name="model" required></select>
+            </label>
+            <label>
+              Effort
+              <select id="effort" disabled></select>
+            </label>
+          </div>
+          <p class="hint" id="model-notes"></p>
+
+          <fieldset class="tasks">
+            <legend>Tasks <span id="task-count" class="count">0</span></legend>
+            <div class="task-tools">
+              <input id="task-filter" type="search" placeholder="Filter tasks" />
+              <button type="button" id="tasks-all" class="ghost">All</button>
+              <button type="button" id="tasks-none" class="ghost">None</button>
+            </div>
+            <div id="task-list" class="task-list"></div>
+          </fieldset>
+
+          <div class="grid narrow">
+            <label>
+              Concurrent
+              <input id="n_concurrent" type="number" min="1" step="1" value="1" />
+            </label>
+            <label>
+              Attempts
+              <input id="attempts" type="number" min="1" step="1" value="2" />
+            </label>
+            <label>
+              Retries
+              <input id="retries" type="number" min="0" step="1" value="2" />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button type="submit" id="submit">Start run</button>
+            <span id="summary" class="summary"></span>
+          </div>
+        </form>
+        <output id="feedback" class="feedback" hidden></output>
+      </section>
+
+      <section class="card">
+        <h2>Rerun from a job</h2>
+        <p class="hint">
+          Reads the job's own <code>config.json</code>: agent, model route, effort and
+          tasks. A field it cannot resolve is named, never guessed.
+        </p>
+        <div class="inline">
+          <input
+            id="from-job"
+            list="job-names"
+            placeholder="job name, e.g. verify-codexfix-codex-swe-2-1-max-v1"
+          />
+          <datalist id="job-names"></datalist>
+          <button type="button" id="load-job" class="ghost">Load</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Recent launches</h2>
+        <div id="launches" class="launches">Loading launches…</div>
+      </section>
+    </main>
+    <script src="/launch/launch.js" defer></script>
+  </body>
+</html>

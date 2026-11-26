@@ -1,0 +1,28 @@
+# Base Codex config for Harbor trials routed through 9router's Devin bridge.
+#
+# Two problems are solved here.
+#
+# 1. Auth. Codex attaches the bearer token from env_key when it talks to a
+#    custom provider, so OPENAI_API_KEY must be in the agent's environment.
+#    run_matrix.sh passes it from NINEROUTER_API_KEY. Do not add
+#    requires_openai_auth here: Codex 0.171 reports it as an unrecognized
+#    setting and ignores it, and the jobs that carried it still ran without a
+#    key.
+#
+# 2. Retry budget. Devin's classifier can block even trivial input, and Codex's
+#    reconnect backoff turns a blocked turn into a long no-op. Measured: 40
+#    retries spent 3h02m and 6 retries spent 44m, both producing zero tokens and
+#    no usable trial. Two retries fail in a couple of minutes, which surfaces a
+#    real ApiOverloadedError; Harbor's attempts and retries cover a later streak.
+#    supports_websockets=false forces plain HTTPS SSE because 9router does not
+#    terminate the Responses WebSocket subprotocol.
+model_provider = "ninerouter"
+
+[model_providers.ninerouter]
+name = "ninerouter"
+wire_api = "responses"
+env_key = "OPENAI_API_KEY"
+supports_websockets = false
+stream_max_retries = 2
+request_max_retries = 1
+stream_idle_timeout_ms = 120000

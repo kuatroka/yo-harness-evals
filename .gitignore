@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+datasets/
+jobs/
+logs/
+results/
+archive/
+.audit/
+.viewer_static/
+.pytest_cache/
+*.log
+*.egg-info/
+.DS_Store

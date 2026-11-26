@@ -1,0 +1,340 @@
+/* The launch page borrows the viewer's shape, not its stylesheet. Every rule
+   here stands alone so a Harbor upgrade that rewrites the bundle cannot break
+   this page. Colours follow the OS scheme. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --ink: #17181c;
+  --muted: #64646f;
+  --line: #dcdce3;
+  --accent: #2563eb;
+  --ok: #147a4b;
+  --warn: #a35a00;
+  --chip: #eef0f5;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131417;
+    --card: #1b1c20;
+    --ink: #ececf1;
+    --muted: #9a9aa6;
+    --line: #2f3037;
+    --accent: #6d9bff;
+    --ok: #5fd39a;
+    --warn: #f0b366;
+    --chip: #26272d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+code {
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--chip);
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+}
+
+.page {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.lede,
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.back {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  padding-top: 0.35rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.15rem 1.25rem 1.3rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.9rem;
+}
+
+.grid.narrow {
+  margin-top: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 26rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+select,
+input,
+button {
+  font: inherit;
+  color: var(--ink);
+}
+
+select,
+input[type="search"],
+input[type="number"],
+.inline input {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.9rem;
+  min-width: 0;
+}
+
+select:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.hint code {
+  font-size: 0.8rem;
+}
+
+.tasks {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0 0.35rem;
+}
+
+.count {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.task-tools {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.task-tools input {
+  flex: 1;
+}
+
+.task-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.15rem 0.75rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+
+.task {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--ink);
+  padding: 0.12rem 0;
+}
+
+.task span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task[hidden] {
+  display: none;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1.1rem;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+button.ghost:hover {
+  background: var(--chip);
+}
+
+.summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.feedback {
+  display: block;
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--chip);
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+}
+
+.feedback.ok {
+  color: var(--ok);
+}
+
+.feedback.warn {
+  color: var(--warn);
+}
+
+.feedback[hidden] {
+  display: none;
+}
+
+.inline {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.inline input {
+  flex: 1;
+}
+
+.launches table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.launches th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding: 0.4rem 0.5rem;
+  white-space: nowrap;
+}
+
+.launches td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.45rem 0.5rem;
+  vertical-align: top;
+}
+
+.launches tr:last-child td {
+  border-bottom: none;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--chip);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.status.running {
+  color: var(--accent);
+}
+
+.status.completed {
+  color: var(--ok);
+}
+
+.status.failed {
+  color: var(--warn);
+}
+
+.jobs {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .grid,
+  .grid.narrow {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
+  .masthead {
+    flex-direction: column;
+  }
+}

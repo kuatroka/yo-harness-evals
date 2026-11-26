@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "context7-plugin@context7": true,
+    "visual-explainer@visual-explainer": true,
+    "pstack@pstack-claude": true
+  }
+}
