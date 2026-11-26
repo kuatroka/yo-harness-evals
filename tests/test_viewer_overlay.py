@@ -125,6 +125,46 @@ class RerunTest(unittest.TestCase):
         self.assertEqual(resolution.spec.dataset, "bench-fast")
         self.assertEqual(resolution.spec.tasks, ("burntsushi__ripgrep-2555",))
 
+    def test_a_rerun_keeps_the_jobs_attempts_concurrency_and_retries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = Path(tmp) / "counted-job"
+            job.mkdir()
+            (job / "config.json").write_text(
+                json.dumps(
+                    {
+                        "agents": [
+                            {
+                                "name": "harnesses.droid:DroidAgent",
+                                "model_name": "devin/swe-2-1-max",
+                                "kwargs": {
+                                    "model_id": "9r/dv-bridge/swe-2-1-max",
+                                    "effort": "max",
+                                },
+                            }
+                        ],
+                        "datasets": [
+                            {
+                                "path": str(self.datasets / "frontier-harness-eval"),
+                                "task_names": ["wal-recovery-ordering"],
+                            }
+                        ],
+                        "n_attempts": 3,
+                        "n_concurrent_trials": 1,
+                        "retry": {"max_retries": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            resolution = launch.resolve_from_job(
+                job, self.reg, self.datasets, job.name
+            )
+
+        self.assertEqual(resolution.unresolved, ())
+        assert resolution.spec is not None
+        self.assertEqual(resolution.spec.attempts, 3)
+        self.assertEqual(resolution.spec.retries, 0)
+        self.assertEqual(resolution.spec.n_concurrent, 1)
+
     def test_unreadable_config_is_named_not_guessed(self):
         with tempfile.TemporaryDirectory() as tmp:
             job = Path(tmp) / "broken-job"

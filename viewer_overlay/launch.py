@@ -217,6 +217,8 @@ def _candidates_from_job(
         else ()
     )
     dataset = _dataset_name(first_dataset.get("path"))
+    retry = config.get("retry")
+    retry = retry if isinstance(retry, dict) else {}
 
     candidates: dict[str, Any] = {
         "agent": agent,
@@ -224,6 +226,9 @@ def _candidates_from_job(
         "effort": effort,
         "tasks": tasks or None,
         "dataset": dataset,
+        "n_concurrent": config.get("n_concurrent_trials"),
+        "attempts": config.get("n_attempts"),
+        "retries": retry.get("max_retries"),
         "from_job": job_name,
     }
     return {key: value for key, value in candidates.items() if value is not None}, ()
