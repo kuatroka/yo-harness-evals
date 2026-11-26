@@ -5,11 +5,10 @@ The viewer customization belongs in ``viewer_overlay/``, never in
 behind as orphans, so an edit there disappears without a trace while the tests
 still pass.
 
-Two static assets are the one exception: the Total column is a string patch on
-the built SvelteKit bundle, applied by ``scripts/patch_viewer_columns.sh``. An
-upgrade replaces those files with pristine ones and the marker disappears, so
-this test fails here, naming the fix, instead of the column quietly vanishing
-from the UI.
+The Total column is a string patch on the built SvelteKit bundle. The overlay
+applies it to its own copy in ``.viewer_static/``, so the install stays
+pristine. The build test proves that copy still gets the column after a Harbor
+upgrade changes the bundle's file names.
 
 Run directly: ``uv run --with pytest python -m pytest tests/test_harbor_upgrade_guard.py -q``
 """
@@ -18,28 +17,13 @@ from __future__ import annotations
 
 import base64
 import csv
-import fnmatch
 import hashlib
+import tempfile
 from pathlib import Path
 
 import harbor
 
-# The patched assets and the marker each one must contain. Asserting the marker
-# rather than a file hash keeps the guard honest across harmless re-patches: the
-# build names change with every Harbor release, and the bytes change with every
-# edit to the patch script. What must survive is the column definition.
-ASSET_DIR = "harbor/viewer/static/assets"
-STATIC_TOTAL_COLUMN = {
-    "home-*.js": 'accessorKey:"total_all_tokens"',
-    "rollouts-table-*.js": 'accessorKey:"total_tokens"',
-}
-# A key in these arrays is hidden by default, so defining the column is not
-# enough to make it render. An earlier version of the patch script appended the
-# new key here and the column never appeared.
-HIDDEN_BY_DEFAULT = {
-    "home-*.js": '"total_cached_input_tokens","total_all_tokens"]',
-    "rollouts-table-*.js": '"cached_input_tokens","total_tokens"]',
-}
+from viewer_overlay import columns, static_build
 
 
 def _harbor_root() -> Path:
@@ -77,15 +61,8 @@ def _shipped_files() -> list[Path]:
     ]
 
 
-def _is_patchable_asset(relative: str) -> bool:
-    if not relative.startswith(ASSET_DIR + "/"):
-        return False
-    name = relative.rsplit("/", 1)[-1]
-    return any(fnmatch.fnmatch(name, pattern) for pattern in STATIC_TOTAL_COLUMN)
-
-
-def test_install_is_pristine_except_known_static_assets() -> None:
-    """Any edit to a Python file under site-packages must move into the overlay."""
+def test_install_is_pristine() -> None:
+    """Any edit to a file under site-packages must move into the overlay."""
     record = _record_hashes()
     site_packages = _site_packages()
 
@@ -93,8 +70,6 @@ def test_install_is_pristine_except_known_static_assets() -> None:
     added = []
     for path in _shipped_files():
         relative = str(path.relative_to(site_packages))
-        if _is_patchable_asset(relative):
-            continue
         if relative not in record:
             added.append(relative)
         elif _hash(path) != record[relative]:
@@ -113,28 +88,15 @@ def test_install_is_pristine_except_known_static_assets() -> None:
     )
 
 
-def test_static_total_column_patch_is_present() -> None:
-    """The Total column lives in two built assets. An upgrade replaces them."""
-    assets = _site_packages() / ASSET_DIR
-    missing: list[str] = []
+def test_the_build_adds_the_total_column_to_its_own_copy() -> None:
+    """The column is applied to ``.viewer_static/``, never to site-packages."""
+    source = _harbor_root() / "viewer" / "static"
+    before = {path: path.read_bytes() for path in source.rglob("*") if path.is_file()}
 
-    for pattern, marker in STATIC_TOTAL_COLUMN.items():
-        matches = sorted(assets.glob(pattern))
-        if not matches:
-            missing.append(f"{pattern} (no file matches)")
-            continue
-        hidden = HIDDEN_BY_DEFAULT[pattern]
-        for path in matches:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            if marker not in text:
-                missing.append(f"{path.name} (no {marker})")
-            elif hidden in text:
-                missing.append(f"{path.name} (Total is in the default-hide list)")
+    with tempfile.TemporaryDirectory() as tmp:
+        target = Path(tmp) / "built"
+        static_build.build(target, source, force=True)
+        assert columns.verify(target / "assets") == []
 
-    assert not missing, (
-        f"The Total column patch is missing for harbor {harbor.__version__}: "
-        f"{missing}. Re-apply it with scripts/patch_viewer_columns.sh, then "
-        "restart the viewer. If the script reports the files patched but this "
-        "still fails, the bundle changed shape, so check the column is not left "
-        "in the table's default-hide array before re-pinning this guard."
-    )
+    after = {path: path.read_bytes() for path in source.rglob("*") if path.is_file()}
+    assert before == after, "the build modified Harbor's installed bundle"

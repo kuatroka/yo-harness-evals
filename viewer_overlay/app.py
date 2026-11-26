@@ -15,9 +15,8 @@ from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from harbor.viewer.server import create_app
 
-from . import launch as specs
+from . import harbor_api, launch as specs
 from . import registry, runner, static_build
 from .middleware import OverlayJSONMiddleware
 
@@ -39,7 +38,7 @@ def build_app(
     # Absolute, so a job name in a URL and a log path in a response mean the
     # same thing however the process was started.
     jobs_dir = Path(jobs_dir).expanduser().resolve()
-    app = create_app(jobs_dir, "jobs", static_dir=static.target)
+    app = harbor_api.create_app(jobs_dir, "jobs", static_dir=static.target)
     # Harbor registers a catch-all `GET /{path:path}` that serves the SPA, and
     # Starlette matches routes in order. Routes added after create_app returns
     # would answer /launch with the SPA, so the overlay's go in front.

@@ -1,12 +1,13 @@
 # yo-harness-evals
 
-Local [Frontier Harness](https://frontierharness.org/evaluate-your-own-harness/) runs of three coding harnesses against the same tasks, models and container images, so their scores are comparable to each other.
+Local [Frontier Harness](https://frontierharness.org/evaluate-your-own-harness/) runs of four coding harnesses against the same tasks, models and container images, so their scores are comparable to each other.
 
 | Harness | Agent | Model access |
 |---|---|---|
 | Factory Droid | `harnesses.droid:DroidAgent` | 9Router over `host.docker.internal:20128` |
 | Amp Code | `harnesses.amp:AmpAgent` | 9Router through Amp's server-side connection |
 | Claude Code | `harnesses.claude:ClaudeCodeAgent` | 9Router Anthropic endpoint through the identity shim, or Anthropic direct for `haiku-anthropic-direct` |
+| Codex | Harbor's `codex` agent with `bench/config/codex-base.toml` | 9Router OpenAI-compatible endpoint (`cx/…`) |
 
 Model keys are `swe-2-max`, `swe-2-flash-max`, `swe-2-1-xhigh`, `swe-2-1-max`, `deepseek-engy-max`, `haiku-devin-max`, `haiku-amp-native` and `haiku-anthropic-direct`. A Devin route encodes effort in the model ID. A direct Anthropic id carries none, so `run_matrix.sh` passes `reasoning_effort` from the registry and the adapter launches the CLI with `--effort max`; without that flag the model runs at its default level. Droid relies on the custom model ID, which spells the effort; Amp passes `--model` plus `--effort max`. A model label carries effort only when the route encodes it: the jobs table turns a trailing `-max` into `(max)` (`viewer_overlay/display.py`), and a direct Anthropic id has no suffix. For those rows read the trial's `reasoning_effort`, which the Claude adapter also copies into agent metadata as `effort`.
 
@@ -34,6 +35,8 @@ uv run harbor download frontier-harness-eval/frontier-harness-eval@v1.1.0 --expo
 ```
 
 `.env` needs `NINEROUTER_API_KEY` for Droid and for Claude Code when it runs through the shim. Amp needs `AMP_API_KEY` (an `sgamp_` access token). Claude Code on an Anthropic model uses the host's own Claude Code login instead, read from the macOS keychain, so no key goes in `.env` for that route. Droid uses `FACTORY_API_KEY` when set and otherwise copies the host login from `~/.factory`. Task images must be glibc based; Alpine and musl are refused.
+
+Two model routes are separate services, not code in this repo. 9Router answers on `host.docker.internal:20128` and the Devin bridge on `20130`; `bench/config/models.json` records which model keys need each one. Both must be running before a job names them. The only shim here is `scripts/claude_identity_shim.py`, which `run_matrix.sh` starts on `20140` and stops afterward. Nothing in this repository vendors 9Router or the Devin bridge.
 
 ## Run
 
@@ -101,7 +104,7 @@ The overlay in `viewer_overlay/` imports Harbor's own `create_app` and splices i
 
 `/launch` picks a dataset, a harness, a model key that harness can route, an effort and one or more tasks. A rerun prefills from the source job's `config.json`, including the dataset that job used, and reports every field it cannot resolve instead of guessing. Launching shells out to `scripts/run_matrix.sh`, the same path a terminal run takes.
 
-The one exception to leaving `site-packages` alone is the compiled bundle's Total column. `scripts/patch_viewer_columns.sh` adds it, and `tests/test_harbor_upgrade_guard.py` fails with the re-patch command after an upgrade replaces those assets.
+The Total column is a string patch on Harbor's compiled bundle. The overlay applies it to its own copy in `.viewer_static/` while it builds, so a Harbor upgrade only changes the bytes it copies. `tests/test_harbor_upgrade_guard.py` fails when the install is not pristine or when the built copy loses the column, and `viewer_overlay/columns.py` raises at startup when the bundle changes shape.
 
 `uv run harbor view jobs` still serves Harbor's own viewer, without the overlay. Give it another port with `PORT=8081 uv run harbor view jobs` while the overlay owns 8080.
 
