@@ -676,6 +676,22 @@ class AppRoutesTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        missing = cls.jobs / "missing-config"
+        trial = missing / "task__abc"
+        trial.mkdir(parents=True)
+        (trial / "config.json").write_text(
+            json.dumps(
+                {
+                    "task": {"source": "bench-fast"},
+                    "agent": {
+                        "name": "harnesses.amp:AmpAgent",
+                        "model_name": "engy/deepseek-v4.1-flash-1017(max)",
+                    },
+                    "environment": {"type": "docker"},
+                }
+            ),
+            encoding="utf-8",
+        )
         cls.app = overlay_app.build_app(cls.jobs, root / ".viewer_static", cls.datasets)
         from fastapi.testclient import TestClient
 
@@ -732,6 +748,21 @@ class AppRoutesTest(unittest.TestCase):
         # A retired row stays resolvable for archived trials, and routes to nobody.
         self.assertEqual(by_key["9r/dv-bridge/haiku-5-5-xhigh"]["harnesses"], [])
         self.assertIn("9r/dv-bridge/swe-2-1-max", by_key)
+
+    def test_a_job_without_config_still_has_summary_columns(self):
+        response = self.client.get("/api/jobs")
+        self.assertEqual(response.status_code, 200)
+        item = next(
+            (job for job in response.json()["items"] if job["name"] == "missing-config"),
+            None,
+        )
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual(item["datasets"], ["bench-fast"])
+        self.assertEqual(item["agents"], ["Amp"])
+        self.assertEqual(item["providers"], ["engy"])
+        self.assertEqual(item["models"], ["deepseek-v4.1-flash-1017(max)"])
+        self.assertEqual(item["environment_type"], "docker")
 
     def test_an_unresolvable_launch_answers_409_with_the_partial_spec(self):
         response = self.post_launch(
