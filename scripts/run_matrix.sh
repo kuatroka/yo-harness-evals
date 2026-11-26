@@ -106,6 +106,10 @@ for harness in "${HARNESS_LIST[@]}"; do
 done
 
 REGISTRY_PY=(.venv/bin/python bench/model_id.py)
+if ! "${REGISTRY_PY[@]}" check; then
+  echo "model registry is invalid" >&2
+  exit 2
+fi
 KNOWN_EFFORTS=",$("${REGISTRY_PY[@]}" efforts),"
 for effort in "${EFFORT_LIST[@]}"; do
   case "$KNOWN_EFFORTS" in
@@ -175,6 +179,7 @@ run_job() {
   local effort="$3"
   local harbor_model
   local job_name
+  local model_slug
   local -a agent_args=()
   local -a run_prefix=()
   local direct_anthropic=0
@@ -182,7 +187,10 @@ run_job() {
   if [ -n "$model_key" ]; then
     harbor_model="$("${REGISTRY_PY[@]}" "$model_key" route)"
     effort="$("${REGISTRY_PY[@]}" "$model_key" effort)"
-    job_name="${JOB_PREFIX}-${harness}-${model_key}-${RUN_ID}"
+    # The id carries slashes. A job folder is a filename, so flatten them once
+    # here; every Python caller uses bench.lib.slug for the same rule.
+    model_slug="${model_key//\//-}"
+    job_name="${JOB_PREFIX}-${harness}-${model_slug}-${RUN_ID}"
   else
     harbor_model="devin/deepseek-v4.1-flash-$effort"
     job_name="${JOB_PREFIX}-${harness}-${effort}-${RUN_ID}"
@@ -247,7 +255,12 @@ run_job() {
   if [ "$harness" != "claude" ]; then
     if [ -n "$model_key" ] && [ "$harness" != "codex" ]; then
       # Codex has no model kwarg; its model comes from -m plus --base-url.
-      agent_args+=(--ak "model=$model_key")
+      # Every adapter takes the route; Droid and Amp also record the id.
+      agent_args+=(--ak "model=$harbor_model")
+      if [ "$harness" = "droid" ] || [ "$harness" = "amp" ]; then
+        # These two adapters record the id for the viewer and the Droid label.
+        agent_args+=(--ak "model_id=$model_key")
+      fi
     fi
     if [ "$harness" = "codex" ]; then
       # Codex only knows reasoning_effort; effort is droid/amp-specific.

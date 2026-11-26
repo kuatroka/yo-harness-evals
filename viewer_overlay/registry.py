@@ -29,15 +29,27 @@ class ModelEntry:
     """One registry row, with what the launch form needs."""
 
     key: str
+    transport: str
+    endpoint: str
+    model: str
     route: str
     provider: str
     effort: str
     harnesses: tuple[str, ...]
     notes: str
 
+    @property
+    def label(self) -> str:
+        """The compact part a picker shows; transport and endpoint stay in the key."""
+        return f"{self.model}-{self.effort}"
+
     def as_dict(self) -> dict[str, object]:
         return {
             "key": self.key,
+            "transport": self.transport,
+            "endpoint": self.endpoint,
+            "model": self.model,
+            "label": self.label,
             "route": self.route,
             "provider": self.provider,
             "effort": self.effort,
@@ -78,6 +90,9 @@ def load(path: Path = REGISTRY_PATH) -> Registry:
     entries = tuple(
         ModelEntry(
             key=key,
+            transport=spec["transport"],
+            endpoint=spec["endpoint"],
+            model=spec["model"],
             route=spec["route"],
             provider=spec["provider"],
             effort=spec["effort"],

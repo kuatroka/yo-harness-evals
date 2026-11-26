@@ -43,6 +43,7 @@
       const option = document.createElement("option");
       option.value = value.value;
       option.textContent = value.label;
+      if (value.title) option.title = value.title;
       select.appendChild(option);
     }
     if (selected != null && values.some((value) => value.value === selected)) {
@@ -90,7 +91,11 @@
     const models = state.options.models.filter((model) => model.harnesses.includes(agent));
     fillSelect(
       $("model"),
-      models.map((model) => ({ value: model.key, label: `${model.key} — ${model.route}` })),
+      models.map((model) => ({
+        value: model.key,
+        label: `${model.label} — ${model.route}`,
+        title: model.key,
+      })),
       selected
     );
     syncEffort();

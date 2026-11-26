@@ -17,6 +17,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 from viewer_overlay import app as overlay_app
 from viewer_overlay import columns, harbor_api, launch, registry, runner, static_build
@@ -45,7 +46,7 @@ class ValidationTest(unittest.TestCase):
     def resolve(self, **overrides: Any) -> launch.Resolution:
         candidates: dict[str, Any] = {
             "agent": "codex",
-            "model": "swe-2-1-max",
+            "model": "9r/dv-bridge/swe-2-1-max",
             "effort": "max",
             "tasks": ["wal-recovery-ordering"],
         }
@@ -75,8 +76,12 @@ class ValidationTest(unittest.TestCase):
         self.assertProblem(self.resolve(model="gpt-99"), "model", "gpt-99")
 
     def test_model_that_does_not_route_the_agent(self):
-        # haiku-devin-max is droid-only in the registry.
-        self.assertProblem(self.resolve(agent="claude", model="haiku-devin-max"), "model", "route")
+        # The Devin Haiku row is droid-only in the registry.
+        self.assertProblem(
+            self.resolve(agent="claude", model="9r/dv-bridge/haiku-5-5-max"),
+            "model",
+            "route",
+        )
 
     def test_unknown_effort(self):
         self.assertProblem(self.resolve(effort="turbo"), "effort", "turbo")
@@ -120,6 +125,46 @@ class RerunTest(unittest.TestCase):
         assert resolution.spec is not None
         self.assertEqual(resolution.spec.dataset, "bench-fast")
         self.assertEqual(resolution.spec.tasks, ("burntsushi__ripgrep-2555",))
+
+    def test_a_rerun_keeps_the_jobs_attempts_concurrency_and_retries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            job = Path(tmp) / "counted-job"
+            job.mkdir()
+            (job / "config.json").write_text(
+                json.dumps(
+                    {
+                        "agents": [
+                            {
+                                "name": "harnesses.droid:DroidAgent",
+                                "model_name": "devin/swe-2-1-max",
+                                "kwargs": {
+                                    "model_id": "9r/dv-bridge/swe-2-1-max",
+                                    "effort": "max",
+                                },
+                            }
+                        ],
+                        "datasets": [
+                            {
+                                "path": str(self.datasets / "frontier-harness-eval"),
+                                "task_names": ["wal-recovery-ordering"],
+                            }
+                        ],
+                        "n_attempts": 3,
+                        "n_concurrent_trials": 1,
+                        "retry": {"max_retries": 0},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            resolution = launch.resolve_from_job(
+                job, self.reg, self.datasets, job.name
+            )
+
+        self.assertEqual(resolution.unresolved, ())
+        assert resolution.spec is not None
+        self.assertEqual(resolution.spec.attempts, 3)
+        self.assertEqual(resolution.spec.retries, 0)
+        self.assertEqual(resolution.spec.n_concurrent, 1)
 
     def test_unreadable_config_is_named_not_guessed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -176,10 +221,44 @@ class RerunTest(unittest.TestCase):
             resolution = launch.resolve_from_job(job, self.reg, self.datasets, job.name)
         self.assertEqual(resolution.unresolved, ())
         assert resolution.spec is not None
-        self.assertEqual(resolution.spec.model, "swe-2-max")
-        entry = self.reg.get("swe-2-max")
+        self.assertEqual(
+            resolution.spec.model, "9r/dv-bridge/swe-2-max"
+        )
+        entry = self.reg.get("9r/dv-bridge/swe-2-max")
         assert entry is not None
         self.assertEqual(entry.route, "devin/swe-2-max")
+
+    def test_a_recorded_model_id_beats_the_shared_route(self):
+        """A native Claude id carries no effort, so the stored id must win."""
+        with tempfile.TemporaryDirectory() as tmp:
+            job = Path(tmp) / "recorded-id-job"
+            job.mkdir()
+            (job / "config.json").write_text(
+                json.dumps(
+                    {
+                        "agents": [
+                            {
+                                "name": "harnesses.claude:ClaudeCodeAgent",
+                                "model_name": "claude-haiku-5-5",
+                                "kwargs": {
+                                    "model_id": "native/claude/haiku-5-5-xhigh"
+                                },
+                            }
+                        ],
+                        "datasets": [
+                            {
+                                "path": str(self.datasets / "frontier-harness-eval"),
+                                "task_names": ["wal-recovery-ordering"],
+                            }
+                        ],
+                    }
+                )
+            )
+            resolution = launch.resolve_from_job(job, self.reg, self.datasets, job.name)
+        self.assertEqual(resolution.unresolved, ())
+        assert resolution.spec is not None
+        self.assertEqual(resolution.spec.model, "native/claude/haiku-5-5-xhigh")
+        self.assertEqual(resolution.spec.effort, "xhigh")
 
 
 class RegistryTest(unittest.TestCase):
@@ -204,7 +283,10 @@ class RegistryTest(unittest.TestCase):
             assert entry is not None
             self.assertEqual(self.cli(key, "route").stdout.strip(), entry.route)
             self.assertEqual(self.cli(key, "effort").stdout.strip(), entry.effort)
-        for key, agent in (("swe-2-1-max", "codex"), ("haiku-devin-max", "claude")):
+        for key, agent in (
+            ("9r/dv-bridge/swe-2-1-max", "codex"),
+            ("9r/dv-bridge/haiku-5-5-max", "claude"),
+        ):
             supported = self.cli(key, "supports", agent).returncode == 0
             self.assertEqual(supported, reg.supports(key, agent))
 
@@ -224,7 +306,7 @@ class RunnerTest(unittest.TestCase):
         make_dataset(self.root / "datasets")
         self.spec = launch.LaunchSpec(
             agent="codex",
-            model="swe-2-1-max",
+            model="9r/dv-bridge/swe-2-1-max",
             effort="max",
             tasks=("wal-recovery-ordering", "adaptive-rejection-sampler"),
             n_concurrent=3,
@@ -243,7 +325,7 @@ class RunnerTest(unittest.TestCase):
         expected = [
             f"JOB_PREFIX=ui-{started.launch_id}",
             "HARNESSES=codex",
-            "MODELS=swe-2-1-max",
+            "MODELS=9r/dv-bridge/swe-2-1-max",
             "EFFORTS=max",
             "TASKS=wal-recovery-ordering,adaptive-rejection-sampler",
             "ATTEMPTS=4",
@@ -363,6 +445,7 @@ class JSONApp:
 
 def run_asgi(app, path: str = "/api/jobs") -> list[dict[str, Any]]:
     sent: list[dict[str, Any]] = []
+    parts = urlsplit(path)
 
     async def receive() -> dict[str, Any]:
         return {"type": "http.request", "body": b"", "more_body": False}
@@ -370,7 +453,19 @@ def run_asgi(app, path: str = "/api/jobs") -> list[dict[str, Any]]:
     async def send(message: dict[str, Any]) -> None:
         sent.append(message)
 
-    asyncio.run(app({"type": "http", "method": "GET", "path": path, "headers": []}, receive, send))
+    asyncio.run(
+        app(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": parts.path,
+                "query_string": parts.query.encode("latin-1"),
+                "headers": [],
+            },
+            receive,
+            send,
+        )
+    )
     return sent
 
 
@@ -428,6 +523,139 @@ class MiddlewareTest(unittest.TestCase):
         start = messages[0]
         headers = dict(start["headers"])
         self.assertEqual(int(headers[b"content-length"]), len(body_of(messages)))
+
+    def test_agent_filter_options_merge_to_display_names(self):
+        body = json.dumps(
+            {
+                "agents": [
+                    {"value": "amp-code", "count": 146},
+                    {"value": "harnesses.amp:AmpAgent", "count": 1},
+                    {"value": "claude-code", "count": 92},
+                    {"value": "factory-droid", "count": 137},
+                    {"value": "codex", "count": 29},
+                    {"value": "harbor.agents.installed.codex:Codex", "count": 1},
+                ]
+            }
+        ).encode("utf-8")
+        messages = run_asgi(
+            OverlayJSONMiddleware(JSONApp(body)), path="/api/rollouts/filters"
+        )
+        payload = json.loads(body_of(messages))
+
+        self.assertEqual(
+            payload["agents"],
+            [
+                {"value": "Amp", "count": 147},
+                {"value": "Claude Code", "count": 92},
+                {"value": "Droid", "count": 137},
+                {"value": "Codex", "count": 30},
+            ],
+        )
+
+    def test_agent_filter_request_expands_the_display_name(self):
+        seen: dict[str, bytes] = {}
+
+        class Probe:
+            async def __call__(self, scope, receive, send) -> None:
+                seen["query"] = scope.get("query_string", b"")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b"{}"})
+
+        run_asgi(
+            OverlayJSONMiddleware(Probe()),
+            path="/api/rollouts?agent=Amp&model=devin%2Fswe-2-1-max",
+        )
+        params = parse_qs(seen["query"].decode("latin-1"))
+
+        self.assertEqual(
+            set(params["agent"]),
+            {"amp-code", "harnesses.amp:AmpAgent", "amp"},
+        )
+        self.assertEqual(params["model"], ["devin/swe-2-1-max"])
+
+        run_asgi(
+            OverlayJSONMiddleware(Probe()),
+            path="/api/rollouts?agent=Claude+Code",
+        )
+        params = parse_qs(seen["query"].decode("latin-1"))
+        self.assertEqual(
+            set(params["agent"]),
+            {"harnesses.claude:ClaudeCodeAgent", "claude-code", "claude"},
+        )
+
+    def test_agent_filter_request_keeps_a_raw_value(self):
+        seen: dict[str, bytes] = {}
+
+        class Probe:
+            async def __call__(self, scope, receive, send) -> None:
+                seen["query"] = scope.get("query_string", b"")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [(b"content-type", b"application/json")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b"{}"})
+
+        run_asgi(
+            OverlayJSONMiddleware(Probe()),
+            path="/api/rollouts?agent=amp-code",
+        )
+
+        self.assertEqual(
+            parse_qs(seen["query"].decode("latin-1")),
+            {"agent": ["amp-code"]},
+        )
+
+    def test_empty_job_summary_is_filled_from_a_trial_config(self):
+        # A job can lose its top-level config.json while keeping its trials.
+        # Harbor then lists it with every config-derived column blank.
+        with tempfile.TemporaryDirectory() as tmp:
+            jobs = Path(tmp) / "jobs"
+            trial = jobs / "lost-config" / "task__abc"
+            trial.mkdir(parents=True)
+            (trial / "config.json").write_text(
+                json.dumps(
+                    {
+                        "task": {"source": "bench-fast"},
+                        "agent": {
+                            "name": "harnesses.amp:AmpAgent",
+                            "model_name": "engy/deepseek-v4.1-flash-1017(max)",
+                        },
+                        "environment": {"type": "docker"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            body = json.dumps(
+                {
+                    "items": [
+                        {
+                            "name": "lost-config",
+                            "datasets": [],
+                            "agents": [],
+                            "providers": [],
+                            "models": [],
+                            "environment_type": None,
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+            messages = run_asgi(OverlayJSONMiddleware(JSONApp(body), jobs_dir=jobs))
+            item = json.loads(body_of(messages))["items"][0]
+
+        self.assertEqual(item["datasets"], ["bench-fast"])
+        self.assertEqual(item["agents"], ["Amp"])
+        self.assertEqual(item["providers"], ["engy"])
+        self.assertEqual(item["models"], ["deepseek-v4.1-flash-1017(max)"])
+        self.assertEqual(item["environment_type"], "docker")
 
     def test_applied_twice_equals_applied_once(self):
         body = json.dumps(self.payload()).encode("utf-8")
@@ -592,6 +820,22 @@ class AppRoutesTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        missing = cls.jobs / "missing-config"
+        trial = missing / "task__abc"
+        trial.mkdir(parents=True)
+        (trial / "config.json").write_text(
+            json.dumps(
+                {
+                    "task": {"source": "bench-fast"},
+                    "agent": {
+                        "name": "harnesses.amp:AmpAgent",
+                        "model_name": "engy/deepseek-v4.1-flash-1017(max)",
+                    },
+                    "environment": {"type": "docker"},
+                }
+            ),
+            encoding="utf-8",
+        )
         cls.app = overlay_app.build_app(cls.jobs, root / ".viewer_static", cls.datasets)
         from fastapi.testclient import TestClient
 
@@ -635,19 +879,40 @@ class AppRoutesTest(unittest.TestCase):
         for model in payload["models"]:
             self.assertTrue(model["route"], model)
             self.assertTrue(model["provider"], model)
+            self.assertTrue(model["label"], model)
+            self.assertIn(model["transport"], ("9r", "native", "direct"))
         by_key = {model["key"]: model for model in payload["models"]}
         self.assertEqual(
-            sorted(by_key["swe-2-1-max"]["harnesses"]), ["amp", "claude", "codex", "droid"]
+            sorted(by_key["9r/dv-bridge/swe-2-1-max"]["harnesses"]),
+            ["amp", "claude", "codex", "droid"],
+        )
+        self.assertEqual(
+            by_key["9r/dv-bridge/swe-2-1-max"]["label"], "swe-2-1-max"
         )
         # A retired row stays resolvable for archived trials, and routes to nobody.
-        self.assertEqual(by_key["haiku-anthropic-direct"]["harnesses"], [])
-        self.assertIn("swe-2-1-max", by_key)
+        self.assertEqual(by_key["9r/dv-bridge/haiku-5-5-xhigh"]["harnesses"], [])
+        self.assertIn("9r/dv-bridge/swe-2-1-max", by_key)
+
+    def test_a_job_without_config_still_has_summary_columns(self):
+        response = self.client.get("/api/jobs")
+        self.assertEqual(response.status_code, 200)
+        item = next(
+            (job for job in response.json()["items"] if job["name"] == "missing-config"),
+            None,
+        )
+        self.assertIsNotNone(item)
+        assert item is not None
+        self.assertEqual(item["datasets"], ["bench-fast"])
+        self.assertEqual(item["agents"], ["Amp"])
+        self.assertEqual(item["providers"], ["engy"])
+        self.assertEqual(item["models"], ["deepseek-v4.1-flash-1017(max)"])
+        self.assertEqual(item["environment_type"], "docker")
 
     def test_an_unresolvable_launch_answers_409_with_the_partial_spec(self):
         response = self.post_launch(
             {
                 "agent": "codex",
-                "model": "swe-2-1-max",
+                "model": "9r/dv-bridge/swe-2-1-max",
                 "effort": "max",
                 "tasks": ["no-such-task"],
             }
@@ -663,7 +928,7 @@ class AppRoutesTest(unittest.TestCase):
         response = self.post_launch(
             {
                 "agent": "codex",
-                "model": "swe-2-1-max",
+                "model": "9r/dv-bridge/swe-2-1-max",
                 "effort": "max",
                 "tasks": ["wal-recovery-ordering"],
                 "n_concurrent": 1,
@@ -687,7 +952,9 @@ class AppRoutesTest(unittest.TestCase):
         self.assertEqual(listed["launch_id"], created["launch_id"])
         self.assertEqual(listed["status"], "pending")
         self.assertEqual(listed["jobs"], [])
-        self.assertEqual(listed["spec"]["model"], "swe-2-1-max")
+        self.assertEqual(
+            listed["spec"]["model"], "9r/dv-bridge/swe-2-1-max"
+        )
         self.assertEqual(listed["spec"]["tasks"], ["wal-recovery-ordering"])
 
     def test_a_job_spec_is_derived_from_its_config(self):
@@ -696,7 +963,9 @@ class AppRoutesTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["unresolved"], [])
         self.assertEqual(payload["spec"]["agent"], "codex")
-        self.assertEqual(payload["spec"]["model"], "swe-2-1-max")
+        self.assertEqual(
+            payload["spec"]["model"], "9r/dv-bridge/swe-2-1-max"
+        )
         self.assertEqual(payload["spec"]["tasks"], ["wal-recovery-ordering"])
         self.assertEqual(payload["spec"]["from_job"], "fixture-job")
 

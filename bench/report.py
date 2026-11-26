@@ -7,7 +7,7 @@ smaller than that is reported as no measurable difference, and the tie is broken
 on measured latency, which has more statistical power than a binary reward.
 
     .venv/bin/python bench/report.py --pair droid,amp
-    .venv/bin/python bench/report.py --pair droid,amp --tier fast --models swe-2-max
+    .venv/bin/python bench/report.py --pair droid,amp --tier fast --models 9r/dv-bridge/swe-2-max
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lib import list_cost, load_config, load_trials, resolve_model, summarise  # noqa: E402
+from lib import list_cost, load_config, load_trials, summarise, trial_model_key  # noqa: E402
 
 DEFAULT_JOBS_DIR = Path(__file__).resolve().parent.parent / "jobs"
 DEFAULT_MANIFEST = Path(__file__).resolve().parent / "config" / "tasks.json"
@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--pair", default="droid,amp", help="two harnesses, left,right")
     parser.add_argument("--tier", default="all", choices=["all", "fast", "slow", "unmeasured"])
-    parser.add_argument("--models", default="all", help="comma separated model keys, or all")
+    parser.add_argument("--models", default="all", help="comma separated model ids, or all")
     parser.add_argument("--harnesses", default="", help="optional harness filter for the summary table")
     parser.add_argument(
         "--include-saturated",
@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cells: dict[tuple, list] = defaultdict(list)
     for trial in trials:
-        cells[(resolve_model(trial.model, models), trial.harness, trial.task)].append(trial)
+        cells[(trial_model_key(trial, models), trial.harness, trial.task)].append(trial)
 
     print(f"{'model':22s} {'harness':8s} {'trials':>6s} {'to':>3s} {'mean':>6s} {'mean*':>6s} {'p50':>6s} {'p90':>6s} {'usd/tr':>7s} {'Input':>12s} {'Cashed':>12s} {'Output':>11s} {'Total':>13s}")
     for key in sorted({cell[0] or "unknown" for cell in cells}):

@@ -28,10 +28,19 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lib import base_of, load_config, load_trials, percentile, resolve_model  # noqa: E402
+from lib import base_of, load_config, load_trials, percentile, trial_model_key  # noqa: E402
 
 DEFAULT_GATE_MINUTES = 20.0
 DEFAULT_JOBS_DIR = Path(__file__).resolve().parent.parent / "jobs"
+
+
+def _source_label(path: Path) -> str:
+    """A repo-relative label, so a tracked manifest carries no host path."""
+    root = Path(__file__).resolve().parent.parent
+    try:
+        return str(Path(path).resolve().relative_to(root))
+    except ValueError:
+        return str(path)
 
 
 def measure(trials, models):
@@ -40,7 +49,7 @@ def measure(trials, models):
     rewards: dict[tuple, list[float]] = defaultdict(list)
     honest: dict[tuple, list[float]] = defaultdict(list)
     for trial in trials:
-        base = base_of(resolve_model(trial.model, models), models) or (trial.model or "unknown")
+        base = base_of(trial_model_key(trial, models), models) or (trial.model or "unknown")
         # A timed-out trial ran until the budget stopped it. Its duration measures
         # the clock, not the task, so it would inflate the percentile that decides
         # whether the task is cheap enough to keep.
@@ -106,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
 
     manifest = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "source": str(args.jobs_dir),
+        "source": _source_label(args.jobs_dir),
         "gate": {
             "p90_minutes": args.gate_minutes,
             "band": [0.1, 0.9],

@@ -1,20 +1,25 @@
 {
-  "deepseek-engy-max": {
-    "base": "deepseek-v4.1-flash",
+  "9r/cx/gpt-6-luna-max": {
+    "transport": "9r",
+    "endpoint": "cx",
+    "model": "gpt-6-luna",
     "effort": "max",
+    "base": "gpt-6-luna",
     "harnesses": [
-      "droid",
-      "amp",
       "claude",
+      "droid",
       "codex"
     ],
-    "notes": "9Router hits the Engy provider directly. Effort is spelled in parentheses.",
-    "provider": "engy",
-    "route": "engy/deepseek-v4.1-flash-1017(max)"
+    "provider": "cx",
+    "route": "cx/gpt-6-luna(max)",
+    "notes": "Amp cannot reach the cx provider ('Unknown model provider: cx' through its OpenAI bridge), so amp is excluded; the run would silently no-op."
   },
-  "deepseek-flash-high": {
-    "base": "deepseek-v4.1-flash",
+  "9r/dv-bridge/deepseek-4-1-flash-high": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "deepseek-4-1-flash",
     "effort": "high",
+    "base": "deepseek-4-1-flash",
     "harnesses": [
       "droid",
       "amp",
@@ -23,9 +28,12 @@
     "provider": "devin",
     "route": "devin/deepseek-v4.1-flash-high"
   },
-  "deepseek-flash-max": {
-    "base": "deepseek-v4.1-flash",
+  "9r/dv-bridge/deepseek-4-1-flash-max": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "deepseek-4-1-flash",
     "effort": "max",
+    "base": "deepseek-4-1-flash",
     "harnesses": [
       "droid",
       "amp",
@@ -34,115 +42,70 @@
     "provider": "devin",
     "route": "devin/deepseek-v4.1-flash-max"
   },
-  "haiku-amp-native": {
-    "base": "haiku-5.5",
+  "9r/dv-bridge/haiku-5-5-max": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "haiku-5-5",
     "effort": "max",
-    "harnesses": [
-      "amp"
-    ],
-    "notes": "Amp's own Claude access, no 9Router and no Devin bridge. Same base as the other Haiku rows.",
-    "provider": "anthropic",
-    "route": "anthropic/claude-haiku-5-5"
-  },
-  "haiku-anthropic-direct": {
-    "base": "haiku-5.5",
-    "effort": "max",
-    "harnesses": [],
-    "notes": "Retired in favor of haiku-5.5-max/-xhigh, which now own the native Anthropic route for Claude Code. Kept resolvable (empty harnesses) for archived trials.",
-    "provider": "anthropic",
-    "route": "claude-haiku-5-5"
-  },
-  "haiku-devin-max": {
-    "base": "haiku-5.5",
-    "effort": "max",
+    "base": "haiku-5-5",
     "harnesses": [
       "droid"
     ],
-    "notes": "Droid's route to Haiku 5.5: it has no native Anthropic access, so it goes through 9Router's Devin bridge. Re-enabled now that the Devin weekly quota has recovered.",
     "provider": "devin",
-    "route": "devin/haiku-5-5-max"
+    "route": "devin/haiku-5-5-max",
+    "notes": "Droid's route to Haiku 5.5: it has no native Anthropic access, so it goes through 9Router's Devin bridge. Re-enabled now that the Devin weekly quota has recovered."
   },
-  "swe-2-flash-max": {
-    "base": "swe-2-flash",
+  "9r/dv-bridge/haiku-5-5-xhigh": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "haiku-5-5",
+    "effort": "xhigh",
+    "base": "haiku-5-5",
+    "harnesses": [],
+    "provider": "devin",
+    "route": "devin/haiku-5-5-xhigh",
+    "notes": "Four archived trials recorded this route before the registry had a row for it. Kept resolvable with no harnesses; nothing launches it until a harness proves the route."
+  },
+  "9r/dv-bridge/swe-2-1-max": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "swe-2-1",
     "effort": "max",
-    "harnesses": [
-      "droid",
-      "amp",
-      "claude",
-      "codex"
-    ],
-    "pricing": {
-      "free_until": "2026-12-04T18:00:00Z",
-      "input_per_1m": 0.1,
-      "output_per_1m": 0.5
-    },
-    "provider": "devin",
-    "route": "devin/swe-2-flash-max",
-    "max_concurrency": 2
-  },
-  "swe-2-max": {
-    "base": "swe-2",
-    "effort": "max",
-    "harnesses": [
-      "droid",
-      "amp",
-      "claude",
-      "codex"
-    ],
-    "pricing": {
-      "cached_per_1m": 0.3,
-      "free_until": "2026-11-30",
-      "input_per_1m": 3.0,
-      "output_per_1m": 15.0
-    },
-    "provider": "devin",
-    "route": "devin/swe-2-max",
-    "max_concurrency": 2
-  },
-  "swe-2-1-max": {
     "base": "swe-2-1",
-    "effort": "max",
     "harnesses": [
       "droid",
       "amp",
       "claude",
       "codex"
     ],
-    "notes": "Devin bridge route for swe-2.1 at max effort, already registered in the host custom-model catalog. Droid-only until another harness proves a route. No pricing row yet: cost reporting returns None until Devin publishes rates.",
     "provider": "devin",
     "route": "devin/swe-2-1-max",
-    "max_concurrency": 2
+    "max_concurrency": 2,
+    "notes": "Devin bridge route for swe-2.1 at max effort, already registered in the host custom-model catalog. No pricing row yet: cost reporting returns None until Devin publishes rates."
   },
-  "swe-2-1-xhigh": {
-    "base": "swe-2-1",
+  "9r/dv-bridge/swe-2-1-xhigh": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "swe-2-1",
     "effort": "xhigh",
+    "base": "swe-2-1",
     "harnesses": [
       "droid",
       "amp",
       "claude",
       "codex"
     ],
-    "notes": "Devin bridge route for swe-2.1 at xhigh effort, already registered in the host custom-model catalog. Droid-only until another harness proves a route. No pricing row yet: cost reporting returns None until Devin publishes rates.",
     "provider": "devin",
     "route": "devin/swe-2-1-xhigh",
-    "max_concurrency": 2
+    "max_concurrency": 2,
+    "notes": "Devin bridge route for swe-2.1 at xhigh effort, already registered in the host custom-model catalog. No pricing row yet: cost reporting returns None until Devin publishes rates."
   },
-  "swe-2-high": {
-    "base": "swe-2",
+  "9r/dv-bridge/swe-2-flash-high": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "swe-2-flash",
     "effort": "high",
-    "harnesses": [
-      "claude",
-      "amp",
-      "droid",
-      "codex"
-    ],
-    "provider": "devin",
-    "route": "devin/swe-2-high",
-    "max_concurrency": 2
-  },
-  "swe-2-flash-high": {
     "base": "swe-2-flash",
-    "effort": "high",
     "harnesses": [
       "claude",
       "amp",
@@ -153,49 +116,134 @@
     "route": "devin/swe-2-flash-high",
     "max_concurrency": 2
   },
-  "haiku-5.5-max": {
-    "base": "haiku-5.5",
+  "9r/dv-bridge/swe-2-flash-max": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "swe-2-flash",
     "effort": "max",
-    "harnesses": [
-      "claude"
-    ],
-    "notes": "Claude Code reaches Haiku 5.5 through its native Anthropic route and the subscription OAuth token, not the Devin bridge (Devin's weekly quota is exhausted).",
-    "provider": "anthropic",
-    "route": "claude-haiku-5-5"
-  },
-  "haiku-5.5-xhigh": {
-    "base": "haiku-5.5",
-    "effort": "xhigh",
-    "harnesses": [
-      "claude"
-    ],
-    "notes": "Claude Code reaches Haiku 5.5 through its native Anthropic route and the subscription OAuth token; effort goes in via reasoning_effort, not the route id.",
-    "provider": "anthropic",
-    "route": "claude-haiku-5-5"
-  },
-  "gpt-6-luna-max": {
-    "base": "gpt-6-luna",
-    "effort": "max",
-    "harnesses": [
-      "claude",
-      "droid",
-      "codex"
-    ],
-    "notes": "Amp cannot reach the cx provider ('Unknown model provider: cx' through its OpenAI bridge), so amp is excluded; the run would silently no-op.",
-    "provider": "cx",
-    "route": "cx/gpt-6-luna(max)"
-  },
-  "deepseek-engy-high": {
-    "base": "deepseek-v4.1-flash",
-    "effort": "high",
+    "base": "swe-2-flash",
     "harnesses": [
       "droid",
       "amp",
       "claude",
       "codex"
     ],
-    "notes": "9Router hits the Engy provider directly. Effort is spelled in parentheses.",
+    "provider": "devin",
+    "route": "devin/swe-2-flash-max",
+    "max_concurrency": 2,
+    "pricing": {
+      "free_until": "2026-12-04T18:00:00Z",
+      "input_per_1m": 0.1,
+      "output_per_1m": 0.5
+    }
+  },
+  "9r/dv-bridge/swe-2-high": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "swe-2",
+    "effort": "high",
+    "base": "swe-2",
+    "harnesses": [
+      "claude",
+      "amp",
+      "droid",
+      "codex"
+    ],
+    "provider": "devin",
+    "route": "devin/swe-2-high",
+    "max_concurrency": 2
+  },
+  "9r/dv-bridge/swe-2-max": {
+    "transport": "9r",
+    "endpoint": "dv-bridge",
+    "model": "swe-2",
+    "effort": "max",
+    "base": "swe-2",
+    "harnesses": [
+      "droid",
+      "amp",
+      "claude",
+      "codex"
+    ],
+    "provider": "devin",
+    "route": "devin/swe-2-max",
+    "max_concurrency": 2,
+    "pricing": {
+      "cached_per_1m": 0.3,
+      "free_until": "2026-11-30",
+      "input_per_1m": 3.0,
+      "output_per_1m": 15.0
+    }
+  },
+  "9r/engy/deepseek-4-1-flash-1017-high": {
+    "transport": "9r",
+    "endpoint": "engy",
+    "model": "deepseek-4-1-flash-1017",
+    "effort": "high",
+    "base": "deepseek-4-1-flash",
+    "harnesses": [
+      "droid",
+      "amp",
+      "claude",
+      "codex"
+    ],
     "provider": "engy",
-    "route": "engy/deepseek-v4.1-flash-1017(high)"
+    "route": "engy/deepseek-v4.1-flash-1017(high)",
+    "notes": "9Router hits the Engy provider directly. Effort is spelled in parentheses."
+  },
+  "9r/engy/deepseek-4-1-flash-1017-max": {
+    "transport": "9r",
+    "endpoint": "engy",
+    "model": "deepseek-4-1-flash-1017",
+    "effort": "max",
+    "base": "deepseek-4-1-flash",
+    "harnesses": [
+      "droid",
+      "amp",
+      "claude",
+      "codex"
+    ],
+    "provider": "engy",
+    "route": "engy/deepseek-v4.1-flash-1017(max)",
+    "notes": "9Router hits the Engy provider directly. Effort is spelled in parentheses."
+  },
+  "native/amp/haiku-5-5-max": {
+    "transport": "native",
+    "endpoint": "amp",
+    "model": "haiku-5-5",
+    "effort": "max",
+    "base": "haiku-5-5",
+    "harnesses": [
+      "amp"
+    ],
+    "provider": "anthropic",
+    "route": "anthropic/claude-haiku-5-5",
+    "notes": "Amp's own Claude access, no 9Router and no Devin bridge. Same base as the other Haiku rows."
+  },
+  "native/claude/haiku-5-5-max": {
+    "transport": "native",
+    "endpoint": "claude",
+    "model": "haiku-5-5",
+    "effort": "max",
+    "base": "haiku-5-5",
+    "harnesses": [
+      "claude"
+    ],
+    "provider": "anthropic",
+    "route": "claude-haiku-5-5",
+    "notes": "Claude Code reaches Haiku 5.5 through its native Anthropic route and the subscription OAuth token, not the Devin bridge. Also covers archived trials from the retired direct row."
+  },
+  "native/claude/haiku-5-5-xhigh": {
+    "transport": "native",
+    "endpoint": "claude",
+    "model": "haiku-5-5",
+    "effort": "xhigh",
+    "base": "haiku-5-5",
+    "harnesses": [
+      "claude"
+    ],
+    "provider": "anthropic",
+    "route": "claude-haiku-5-5",
+    "notes": "Effort goes in via reasoning_effort, not the route id."
   }
 }

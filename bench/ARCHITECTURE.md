@@ -49,10 +49,10 @@ The launcher also asks the registry whether a harness may run a model at all
 rather than silently running on whatever route the harness defaults to.
 
 When one model is reachable two ways it gets two rows that share a `base`. Haiku
-5.5 is the live case: `haiku-devin-max` reaches it through the Devin bridge for
-Droid, while `haiku-anthropic-direct` reaches the same model with Claude
-Code's own subscription token, no shim and no 9Router. Ladder tables group by
-base, so the two rows line up. A harness comparison must not read across them
+5.5 is the live case: `9r/dv-bridge/haiku-5-5-max` reaches it through the Devin
+bridge for Droid, while `native/claude/haiku-5-5-max` reaches the same model with
+Claude Code's own subscription token, no shim and no 9Router. Ladder tables group
+by base, so the two rows line up. A harness comparison must not read across them
 without saying so, because the endpoint is part of the treatment.
 
 ## Three gates before a task is used
@@ -166,8 +166,9 @@ The direct Anthropic row measured Claude Code at max effort: one of two
 without a cap and failed. Both `ripgrep-2555` attempts finished in five to seven
 minutes and failed. The same cell measured before the effort flag was wired in
 scored 0 of 2 in two and a half minutes, so the level changed both the answer and
-the clock by roughly four times. `haiku-amp-native` puts Amp on its own Claude
-access at the same effort, so the harness comparison holds the route fixed. Its
+the clock by roughly four times. `native/amp/haiku-5-5-max` puts Amp on its own
+Claude access at the same effort, so the harness comparison holds the route
+fixed. Its
 first valid cell passed both `alacritty` attempts at max effort (12.1M and 9.6M
 input tokens) and failed both `ripgrep` attempts, with tokens recorded on all
 four. The same mode run before the flag was wired in scored zero on its only

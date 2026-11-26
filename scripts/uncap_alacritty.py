@@ -31,7 +31,7 @@ TARGETS = (
     {
         "tag": "ampflash",
         "harness": "amp",
-        "model": "swe-2-flash-max",
+        "model": "9r/dv-bridge/swe-2-flash-max",
         "attempts": 1,
         "job": "fh-amp-swe-2-flash-max-b-111839",
         "old": ("alacritty__alacritty-3921__sEBAFUq",),
@@ -39,7 +39,7 @@ TARGETS = (
     {
         "tag": "claudeflash",
         "harness": "claude",
-        "model": "swe-2-flash-max",
+        "model": "9r/dv-bridge/swe-2-flash-max",
         "attempts": 1,
         "job": "fh-claude-swe-2-flash-max-b-111839",
         "old": ("alacritty__alacritty-3921__4V3pDz7",),
@@ -47,7 +47,7 @@ TARGETS = (
     {
         "tag": "droidflash",
         "harness": "droid",
-        "model": "swe-2-flash-max",
+        "model": "9r/dv-bridge/swe-2-flash-max",
         "attempts": 2,
         "job": "fh-droid-swe-2-flash-max-b-111839",
         "old": ("alacritty__alacritty-3921__ELJpSkr", "alacritty__alacritty-3921__EqkwHAw"),
@@ -55,7 +55,7 @@ TARGETS = (
     {
         "tag": "droidhaiku",
         "harness": "droid",
-        "model": "haiku-devin-max",
+        "model": "9r/dv-bridge/haiku-5-5-max",
         "attempts": 2,
         "job": "fh-droid-haiku-devin-max-b-125023",
         "old": ("alacritty__alacritty-3921__YPKwYkA", "alacritty__alacritty-3921__bPBhq5e"),
@@ -63,7 +63,7 @@ TARGETS = (
     {
         "tag": "claudehaiku",
         "harness": "claude",
-        "model": "haiku-anthropic-direct",
+        "model": "native/claude/haiku-5-5-max",
         "attempts": 1,
         "job": "fh-claude-haiku-anthropic-direct-maxhaiku-131833",
         "old": ("alacritty__alacritty-3921__XwdjJEA",),

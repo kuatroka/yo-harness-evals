@@ -5,8 +5,8 @@ It refuses combinations the registries mark unsupported, so a route that does no
 exist fails here instead of halfway through a batch, and it never asks for more
 concurrency than the narrowest selected harness allows.
 
-    .venv/bin/python bench/plan.py --tier fast --discriminating --models swe-2-max --attempts 3
-    .venv/bin/python bench/plan.py --tier fast --models swe-2-max --attempts 3 --execute
+    .venv/bin/python bench/plan.py --tier fast --discriminating --models 9r/dv-bridge/swe-2-max --attempts 3
+    .venv/bin/python bench/plan.py --tier fast --models 9r/dv-bridge/swe-2-max --attempts 3 --execute
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def concurrency_cap(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harnesses", default="droid,amp")
-    parser.add_argument("--models", required=True, help="comma separated keys from models.json")
+    parser.add_argument("--models", required=True, help="comma separated ids from models.json")
     parser.add_argument("--tier", default="fast", choices=["fast", "slow", "unmeasured", "all"])
     parser.add_argument("--discriminating", action="store_true", help="keep only tasks with a live band")
     parser.add_argument("--tasks", default="", help="override the task list")
@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
 
     unknown = [name for name in models if name not in registry]
     if unknown:
-        print(f"unknown model keys: {unknown}")
+        print(f"unknown model ids: {unknown}")
         return 2
     for model in models:
         for harness in harnesses:

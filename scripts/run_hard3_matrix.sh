@@ -18,8 +18,8 @@ TASKS="${TASKS:-path-tracing-reverse,model-extraction-relu-logits,cancel-async-t
 ATTEMPTS="${ATTEMPTS:-2}"
 CONCURRENCY="${CONCURRENCY:-3}"
 RUN_ID="${RUN_ID:-hard3-$(date +%Y%m%d-%H%M%S)}"
-TRIO="swe-2-max,swe-2-flash-max,deepseek-engy-max"
-QUAD="$TRIO,haiku-devin-max"
+TRIO="9r/dv-bridge/swe-2-max,9r/dv-bridge/swe-2-flash-max,9r/engy/deepseek-4-1-flash-1017-max"
+QUAD="$TRIO,9r/dv-bridge/haiku-5-5-max"
 
 echo "tasks:      $TASKS"
 echo "attempts:   $ATTEMPTS per task, $CONCURRENCY concurrent"

@@ -31,20 +31,6 @@ from .common import (
 )
 
 DroidEffort = Literal["high", "xhigh", "max"]
-DroidModel = Literal[
-    "deepseek-flash-high",
-    "deepseek-flash-max",
-    "deepseek-engy-max",
-    "deepseek-engy-high",
-    "gpt-6-luna-max",
-    "haiku-devin-max",
-    "swe-2-max",
-    "swe-2-high",
-    "swe-2-flash-max",
-    "swe-2-flash-high",
-    "swe-2-1-max",
-    "swe-2-1-xhigh",
-]
 
 
 class DroidOptions(InstalledAgentOptions):
@@ -52,12 +38,16 @@ class DroidOptions(InstalledAgentOptions):
         default="high",
         description="Droid custom-model effort. The model ID encodes this value.",
     )
-    model: DroidModel | None = Field(
+    model: str | None = Field(
         default=None,
         description=(
-            "Droid custom model. Defaults to the DeepSeek Flash variant for "
-            "the selected effort."
+            "Route for the Droid custom model, for example devin/swe-2-1-max. "
+            "Defaults to the DeepSeek Flash variant for the selected effort."
         ),
+    )
+    model_id: str | None = Field(
+        default=None,
+        description="Canonical registry id, for the settings label and metadata.",
     )
     model_base_url: str | None = Field(
         default=None,
@@ -70,29 +60,16 @@ class DroidAgent(BaseInstalledAgent):
 
     Droid custom models encode reasoning effort in the model ID. The adapter
     writes a minimal Factory settings file at configure() time and invokes
-    ``droid exec`` for each trial.
+    ``droid exec`` for each trial. The registry owns model names and routes;
+    this adapter receives a route and keeps no second model table.
     """
 
     capabilities = AgentCapabilities(reasoning_effort=True)
 
-    MODEL_IDS: ClassVar[dict[DroidModel, str]] = {
-        "deepseek-flash-high": "custom:devin/deepseek-v4.1-flash-high",
-        "deepseek-flash-max": "custom:devin/deepseek-v4.1-flash-max",
-        "deepseek-engy-max": "custom:engy/deepseek-v4.1-flash-1017(max)",
-        "deepseek-engy-high": "custom:engy/deepseek-v4.1-flash-1017(high)",
-        "gpt-6-luna-max": "custom:cx/gpt-6-luna(max)",
-        "haiku-devin-max": "custom:devin/haiku-5-5-max",
-        "swe-2-max": "custom:devin/swe-2-max",
-        "swe-2-high": "custom:devin/swe-2-high",
-        "swe-2-flash-max": "custom:devin/swe-2-flash-max",
-        "swe-2-flash-high": "custom:devin/swe-2-flash-high",
-        "swe-2-1-max": "custom:devin/swe-2-1-max",
-        "swe-2-1-xhigh": "custom:devin/swe-2-1-xhigh",
-    }
-    DEFAULT_MODEL_BY_EFFORT: ClassVar[dict[DroidEffort, DroidModel]] = {
-        "high": "deepseek-flash-high",
-        "xhigh": "swe-2-1-xhigh",
-        "max": "deepseek-flash-max",
+    DEFAULT_MODEL_BY_EFFORT: ClassVar[dict[DroidEffort, str]] = {
+        "high": "devin/deepseek-v4.1-flash-high",
+        "xhigh": "devin/swe-2-1-xhigh",
+        "max": "devin/deepseek-v4.1-flash-max",
     }
     DEFAULT_BASE_URL = "http://host.docker.internal:20128/v1"
     DEFAULT_VERSION = "1.15.0"
@@ -134,12 +111,23 @@ class DroidAgent(BaseInstalledAgent):
             info.model_info.provider = provider
         return info
 
+    @staticmethod
+    def _route(value: str) -> str:
+        """Reject an old-style key or an already-prefixed custom id."""
+        route = value.lower()
+        if "/" not in route or route.startswith("custom:"):
+            raise ValueError(
+                f"Droid model must be a route like devin/swe-2-1-max, got {value!r}"
+            )
+        return route
+
     def __init__(
         self,
         *args,
         effort: str | None = None,
         reasoning_effort: str | None = None,
         model: str | None = None,
+        model_id: str | None = None,
         model_base_url: str | None = None,
         **kwargs,
     ):
@@ -151,15 +139,10 @@ class DroidAgent(BaseInstalledAgent):
                 f"Choose one of: {', '.join(self.DEFAULT_MODEL_BY_EFFORT)}"
             )
         self.effort: DroidEffort = cast(DroidEffort, selected)
-        selected_model = (
+        self.model: str = self._route(
             model or self.DEFAULT_MODEL_BY_EFFORT[self.effort]
-        ).lower()
-        if selected_model not in self.MODEL_IDS:
-            raise ValueError(
-                f"Unsupported Droid model {selected_model!r}. "
-                f"Choose one of: {', '.join(self.MODEL_IDS)}"
-            )
-        self.model: DroidModel = cast(DroidModel, selected_model)
+        )
+        self.model_id: str = model_id or self.model
         self.model_base_url = (
             model_base_url
             or self._get_env("DROID_MODEL_BASE_URL")
@@ -168,6 +151,7 @@ class DroidAgent(BaseInstalledAgent):
         if self.options is not None:
             self.options.effort = self.effort
             self.options.model = self.model
+            self.options.model_id = self.model_id
             self.options.model_base_url = self.model_base_url
         self._settings_path: str | None = None
         self._auth_mode: str | None = None
@@ -235,11 +219,7 @@ class DroidAgent(BaseInstalledAgent):
         model = (kwargs or {}).get("model") or cls.DEFAULT_MODEL_BY_EFFORT[
             cast(DroidEffort, effort_key)
         ]
-        if str(model).lower() not in cls.MODEL_IDS:
-            raise ValueError(
-                f"Unsupported Droid model {model!r}. "
-                f"Choose one of: {', '.join(cls.MODEL_IDS)}"
-            )
+        cls._route(str(model))
         if not (
             values.get("NINEROUTER_API_KEY")
             or values.get("DROID_MODEL_API_KEY")
@@ -344,23 +324,20 @@ npm --version
                 ", ".join(name for name, _ in host_auth),
             )
 
-        custom_models: list[dict[str, object]] = []
-        for index, model_key in enumerate(self.MODEL_IDS):
-            model_id = self.MODEL_IDS[model_key]
-            bare_model = model_id.removeprefix("custom:")
-            custom_models.append(
-                {
-                    "id": model_id,
-                    "model": bare_model,
-                    "index": index,
-                    "baseUrl": self.model_base_url,
-                    "apiKey": api_key,
-                    "provider": "generic-chat-completion-api",
-                    "displayName": bare_model,
-                    "maxOutputTokens": 128000,
-                    "noImageSupport": False,
-                }
-            )
+        model_id = f"custom:{self.model}"
+        custom_models: list[dict[str, object]] = [
+            {
+                "id": model_id,
+                "model": self.model,
+                "index": 0,
+                "baseUrl": self.model_base_url,
+                "apiKey": api_key,
+                "provider": "generic-chat-completion-api",
+                "displayName": self.model_id,
+                "maxOutputTokens": 128000,
+                "noImageSupport": False,
+            }
+        ]
 
         await upload_text(
             self,
@@ -393,7 +370,7 @@ npm --version
         assert self._settings_path is not None
 
         workdir = await resolve_workdir(self, environment)
-        model_id = self.MODEL_IDS[self.model]
+        model_id = f"custom:{self.model}"
         env: dict[str, str] = {}
         factory_key = (
             self._factory_key
@@ -420,9 +397,8 @@ npm --version
             f"2>&1 | tee {shlex.quote(log_file)}"
         )
         self.logger.info(
-            "Running Factory Droid with effort=%s model=%s model_key=%s",
+            "Running Factory Droid with effort=%s route=%s",
             self.effort,
-            model_id,
             self.model,
         )
         await self.exec_as_agent(environment, command=command, env=env, cwd=workdir)
@@ -438,7 +414,8 @@ npm --version
             **(context.metadata or {}),
             "harness": "factory-droid",
             "effort": self.effort,
-            "model": self.MODEL_IDS[self.model],
+            "model": f"custom:{self.model}",
             "model_key": self.model,
+            "model_id": self.model_id,
             "auth": self._auth_mode or "unknown",
         }

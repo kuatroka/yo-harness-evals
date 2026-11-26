@@ -9,6 +9,7 @@ its partial trial set would silently bias a comparison.
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -29,6 +30,10 @@ HARNESS_ALIASES = {
 
 TIMEOUT_EXCEPTION = "AgentTimeoutError"
 
+TRANSPORTS = ("9r", "native", "direct")
+HARNESSES = ("droid", "amp", "claude", "codex")
+SEGMENT = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
 
 @dataclass(frozen=True)
 class Trial:
@@ -43,6 +48,8 @@ class Trial:
     tokens_in: int | None = None
     tokens_cached: int | None = None
     tokens_out: int | None = None
+    effort: str | None = None
+    model_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -61,7 +68,59 @@ def load_config(name: str) -> dict:
     return json.loads((CONFIG_DIR / f"{name}.json").read_text())
 
 
-def resolve_model(observed: str | None, models: dict) -> str | None:
+def model_id(spec: dict) -> str:
+    """Build the canonical id from stored fields, never from a parsed key."""
+    return f"{spec['transport']}/{spec['endpoint']}/{spec['model']}-{spec['effort']}"
+
+
+def slug(model_key: str) -> str:
+    """The only safe spelling for a job folder or a log file."""
+    return model_key.replace("/", "-")
+
+
+def validate_models(models: dict) -> list[str]:
+    """Every reason the registry cannot be used, in one pass."""
+    problems: list[str] = []
+    seen: dict[tuple[str, str], str] = {}
+    for key, spec in models.items():
+        missing = [
+            field
+            for field in (
+                "transport",
+                "endpoint",
+                "model",
+                "effort",
+                "base",
+                "provider",
+                "route",
+            )
+            if not spec.get(field)
+        ]
+        if missing:
+            problems.append(f"{key}: missing {', '.join(missing)}")
+            continue
+        expected = model_id(spec)
+        if key != expected:
+            problems.append(f"{key}: id should be {expected}")
+        if spec["transport"] not in TRANSPORTS:
+            problems.append(f"{key}: unknown transport {spec['transport']!r}")
+        for field in ("endpoint", "model", "base", "effort"):
+            if not SEGMENT.match(str(spec[field])):
+                problems.append(f"{key}: {field} {spec[field]!r} is not lower-kebab")
+        unknown = set(spec.get("harnesses") or ()) - set(HARNESSES)
+        if unknown:
+            problems.append(f"{key}: unknown harnesses {sorted(unknown)}")
+        pair = (spec["route"], spec["effort"])
+        if pair in seen:
+            problems.append(f"{key}: route+effort already used by {seen[pair]}")
+        else:
+            seen[pair] = key
+    return problems
+
+
+def resolve_model(
+    observed: str | None, models: dict, effort: str | None = None
+) -> str | None:
     """Map a model id as Harbor recorded it onto a key in models.json."""
     if not observed:
         return None
@@ -70,10 +129,19 @@ def resolve_model(observed: str | None, models: dict) -> str | None:
     if name.startswith("dv/"):
         candidates.append("devin/" + name.split("/", 1)[1])
     matches = [key for key, spec in models.items() if spec["route"] in candidates]
-    # Two rows may share a route when one is paused (empty harnesses). Prefer
-    # the row a harness can still run.
+    if effort:
+        matches = [key for key in matches if models[key]["effort"] == effort.lower()]
+    # A route can carry two effort variants (a native Anthropic id has no
+    # suffix). Prefer a row a harness can still run when the effort is unknown.
     enabled = [key for key in matches if models[key].get("harnesses")]
     return (enabled[0] if enabled else matches[0]) if matches else None
+
+
+def trial_model_key(trial: Trial, models: dict) -> str | None:
+    """Prefer the id the job recorded; old jobs fall back to route and effort."""
+    if trial.model_id in models:
+        return trial.model_id
+    return resolve_model(trial.model, models, trial.effort)
 
 
 def base_of(model_key: str | None, models: dict) -> str | None:
@@ -159,8 +227,13 @@ def load_trials(jobs_dir: Path, include_running_jobs: bool = False) -> list[Tria
             data = json.loads(trial_path.read_text())
             agent_info = data.get("agent_info") or {}
             config_agent = (data.get("config") or {}).get("agent") or {}
+            kwargs = config_agent.get("kwargs") or {}
+            if not isinstance(kwargs, dict):
+                kwargs = {}
             harness = HARNESS_ALIASES.get(agent_info.get("name")) or HARNESS_ALIASES.get(config_agent.get("name"))
             model = (agent_info.get("model_info") or {}).get("name") or config_agent.get("model_name")
+            effort = kwargs.get("effort") or kwargs.get("reasoning_effort")
+            recorded_id = kwargs.get("model_id")
             trials.append(
                 Trial(
                     job=job.name,
@@ -177,6 +250,8 @@ def load_trials(jobs_dir: Path, include_running_jobs: bool = False) -> list[Tria
                     tokens_in=(data.get("agent_result") or {}).get("n_input_tokens"),
                     tokens_cached=(data.get("agent_result") or {}).get("n_cache_tokens"),
                     tokens_out=(data.get("agent_result") or {}).get("n_output_tokens"),
+                    effort=effort if isinstance(effort, str) else None,
+                    model_id=recorded_id if isinstance(recorded_id, str) else None,
                 )
             )
     return trials
@@ -191,7 +266,7 @@ def list_cost(trial: Trial, models: dict) -> float | None:
     honest source: ``free_until`` makes the real cost zero inside its window,
     and a model with no pricing row returns None rather than a fake number.
     """
-    spec = models.get(resolve_model(trial.model, models)) or {}
+    spec = models.get(trial_model_key(trial, models)) or {}
     pricing = spec.get("pricing")
     if not pricing or trial.tokens_out is None:
         return None

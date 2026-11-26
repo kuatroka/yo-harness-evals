@@ -9,33 +9,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "bench"))
 from harbor.agents.installed.base import ApiUsageLimitError
 from harbor.models.agent.context import AgentContext
 
-from harnesses.amp import AmpAgent, AmpModel
+from harnesses.amp import AmpAgent
 from harnesses.claude import ClaudeCodeAgent
-from harnesses.droid import DroidAgent, DroidModel
+from harnesses.droid import DroidAgent
 
 
 class DroidModelTableTest(unittest.TestCase):
-    def test_new_router_models_are_registered(self):
-        self.assertEqual(
-            DroidAgent.MODEL_IDS["deepseek-engy-max"],
-            "custom:engy/deepseek-v4.1-flash-1017(max)",
-        )
-        self.assertEqual(
-            DroidAgent.MODEL_IDS["haiku-devin-max"], "custom:devin/haiku-5-5-max"
-        )
-        self.assertEqual(
-            DroidAgent.MODEL_IDS["swe-2-1-xhigh"], "custom:devin/swe-2-1-xhigh"
-        )
-        self.assertEqual(
-            DroidAgent.MODEL_IDS["swe-2-1-max"], "custom:devin/swe-2-1-max"
-        )
-
-    def test_every_literal_key_has_an_id(self):
-        for key in DroidModel.__args__:
-            with self.subTest(key=key):
-                self.assertIn(key, DroidAgent.MODEL_IDS)
-                route = DroidAgent.MODEL_IDS[key]
-                self.assertTrue(route.startswith("custom:"))
+    def test_every_effort_has_a_default_route(self):
+        for effort, route in DroidAgent.DEFAULT_MODEL_BY_EFFORT.items():
+            with self.subTest(effort=effort):
+                self.assertIn("/", route)
 
     def test_xhigh_is_a_valid_effort(self):
         with tempfile.TemporaryDirectory() as logs:
@@ -43,19 +26,39 @@ class DroidModelTableTest(unittest.TestCase):
                 logs_dir=Path(logs),
                 model_name="devin/swe-2-1-xhigh",
                 effort="xhigh",
-                model="swe-2-1-xhigh",
+                model="devin/swe-2-1-xhigh",
             )
         self.assertEqual(agent.effort, "xhigh")
-        self.assertEqual(agent.model, "swe-2-1-xhigh")
+        self.assertEqual(agent.model, "devin/swe-2-1-xhigh")
+
+    def test_an_old_style_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as logs, self.assertRaises(ValueError):
+            DroidAgent(
+                logs_dir=Path(logs),
+                model_name="devin/swe-2-1-max",
+                model="swe-2-1-max",
+            )
+
+    def test_the_default_route_follows_the_effort(self):
+        with tempfile.TemporaryDirectory() as logs:
+            agent = DroidAgent(
+                logs_dir=Path(logs),
+                model_name="devin/deepseek-v4.1-flash-max",
+                effort="max",
+            )
+        self.assertEqual(agent.model, "devin/deepseek-v4.1-flash-max")
 
     def test_swe_2_1_rows_resolve_through_the_registry(self):
         import lib
+
         models = lib.load_config("models")
         self.assertEqual(
-            lib.resolve_model("custom:devin/swe-2-1-xhigh", models), "swe-2-1-xhigh"
+            lib.resolve_model("custom:devin/swe-2-1-xhigh", models),
+            "9r/dv-bridge/swe-2-1-xhigh",
         )
         self.assertEqual(
-            lib.resolve_model("custom:devin/swe-2-1-max", models), "swe-2-1-max"
+            lib.resolve_model("custom:devin/swe-2-1-max", models),
+            "9r/dv-bridge/swe-2-1-max",
         )
 
 
@@ -122,44 +125,30 @@ class ProviderQuotaPatternTest(unittest.TestCase):
 
 
 class AmpModelTableTest(unittest.TestCase):
-    def test_new_router_models_are_registered(self):
-        self.assertEqual(
-            AmpAgent.MODE_SPECS["deepseek-engy-max"]["model"],
-            "engy/deepseek-v4.1-flash-1017(max)",
-        )
-        self.assertEqual(
-            AmpAgent.MODE_SPECS["haiku-devin-max"]["model"], "devin/haiku-5-5-max"
-        )
-        self.assertEqual(
-            AmpAgent.MODE_SPECS["swe-2-1-xhigh"]["model"], "devin/swe-2-1-xhigh"
-        )
-        self.assertEqual(
-            AmpAgent.MODE_SPECS["swe-2-1-xhigh"]["effort"], "xhigh"
-        )
-        self.assertEqual(
-            AmpAgent.MODE_SPECS["swe-2-1-max"]["model"], "devin/swe-2-1-max"
-        )
+    def test_every_effort_has_a_default_route(self):
+        for effort, route in AmpAgent.DEFAULT_MODEL_BY_EFFORT.items():
+            with self.subTest(effort=effort):
+                self.assertIn("/", route)
 
-    def test_every_literal_key_has_a_mode(self):
-        for key in AmpModel.__args__:
-            with self.subTest(key=key):
-                self.assertIn(key, AmpAgent.MODE_SPECS)
+    def test_a_route_is_kept_beside_the_registry_id(self):
+        with tempfile.TemporaryDirectory() as logs:
+            agent = AmpAgent(
+                logs_dir=Path(logs),
+                model_name="devin/swe-2-1-max",
+                effort="max",
+                model="devin/swe-2-1-max",
+                model_id="9r/dv-bridge/swe-2-1-max",
+            )
+        self.assertEqual(agent.model, "devin/swe-2-1-max")
+        self.assertEqual(agent.model_id, "9r/dv-bridge/swe-2-1-max")
 
-    def test_plugin_registers_every_mode(self):
-        """Amp selects modes by label, so the uploaded plugin must match MODE_SPECS."""
-        plugin = AmpAgent.PLUGIN_SOURCE
-        for key, spec in AmpAgent.MODE_SPECS.items():
-            with self.subTest(key=key):
-                self.assertIn(f"label: '{spec['label']}'", plugin)
-                self.assertIn(f"model: '{spec['model']}'", plugin)
-                self.assertIn(
-                    f"reasoningEffort: '{spec['effort']}'", plugin
-                )
-                self.assertIn(f'"label":"{spec["label"]}"', plugin)
-
-    def test_mode_labels_are_unique(self):
-        labels = [spec["label"] for spec in AmpAgent.MODE_SPECS.values()]
-        self.assertEqual(len(labels), len(set(labels)))
+    def test_an_old_style_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as logs, self.assertRaises(ValueError):
+            AmpAgent(
+                logs_dir=Path(logs),
+                model_name="devin/swe-2-1-max",
+                model="swe-2-1-max",
+            )
 
 
 class ClaudeMetadataTest(unittest.TestCase):

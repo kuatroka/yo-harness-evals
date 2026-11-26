@@ -43,7 +43,7 @@ def build_app(
     # Starlette matches routes in order. Routes added after create_app returns
     # would answer /launch with the SPA, so the overlay's go in front.
     app.router.routes[0:0] = _overlay_router(reg, Path(jobs_dir), Path(datasets_root)).routes
-    app.add_middleware(OverlayJSONMiddleware)
+    app.add_middleware(OverlayJSONMiddleware, jobs_dir=Path(jobs_dir))
     return app
 
 

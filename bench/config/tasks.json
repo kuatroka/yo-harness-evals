@@ -10,37 +10,37 @@
     "p90_minutes": 20.0
   },
   "generated_at": "2026-11-21T12:36:43+00:00",
-  "source": "/Users/yo_macbook/Documents/dev/yo-harness-evals/jobs",
+  "source": "jobs",
   "tasks": {
     "alacritty__alacritty-3921": {
       "band": {
-        "deepseek-v4.1-flash": 1.0,
-        "haiku-5.5": 0.167,
+        "deepseek-4-1-flash": 1.0,
+        "haiku-5-5": 0.167,
         "swe-2": 0.833,
         "swe-2-flash": 0.667
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0,
-        "haiku-5.5": 0.167,
+        "deepseek-4-1-flash": 1.0,
+        "haiku-5-5": 0.167,
         "swe-2": 0.833,
         "swe-2-flash": 0.667
       },
       "discriminates": true,
       "n": {
-        "deepseek-v4.1-flash": 6,
-        "haiku-5.5": 6,
+        "deepseek-4-1-flash": 6,
+        "haiku-5-5": 6,
         "swe-2": 6,
         "swe-2-flash": 6
       },
       "p50": {
-        "deepseek-v4.1-flash": 9.5,
-        "haiku-5.5": 3.9,
+        "deepseek-4-1-flash": 9.5,
+        "haiku-5-5": 3.9,
         "swe-2": 5.3,
         "swe-2-flash": 6.1
       },
       "p90": {
-        "deepseek-v4.1-flash": 10.4,
-        "haiku-5.5": 9.5,
+        "deepseek-4-1-flash": 10.4,
+        "haiku-5-5": 9.5,
         "swe-2": 7.1,
         "swe-2-flash": 6.8
       },
@@ -49,31 +49,31 @@
     },
     "burntsushi__ripgrep-2555": {
       "band": {
-        "deepseek-v4.1-flash": 0.0,
-        "haiku-5.5": 0.0,
+        "deepseek-4-1-flash": 0.0,
+        "haiku-5-5": 0.0,
         "swe-2": 0.0,
         "swe-2-flash": 0.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 0.0,
-        "haiku-5.5": 0.0,
+        "deepseek-4-1-flash": 0.0,
+        "haiku-5-5": 0.0,
         "swe-2": 0.0,
         "swe-2-flash": 0.0
       },
       "discriminates": false,
       "n": {
-        "deepseek-v4.1-flash": 6,
-        "haiku-5.5": 6,
+        "deepseek-4-1-flash": 6,
+        "haiku-5-5": 6,
         "swe-2": 6,
         "swe-2-flash": 6
       },
       "p50": {
-        "haiku-5.5": 5.5,
+        "haiku-5-5": 5.5,
         "swe-2": 9.5,
         "swe-2-flash": 1.0
       },
       "p90": {
-        "haiku-5.5": 7.3,
+        "haiku-5-5": 7.3,
         "swe-2": 10.9,
         "swe-2-flash": 9.7
       },
@@ -82,24 +82,24 @@
     },
     "burntsushi__ripgrep-2576": {
       "band": {
-        "deepseek-v4.1-flash": 1.0,
+        "deepseek-4-1-flash": 1.0,
         "swe-2": 1.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0,
+        "deepseek-4-1-flash": 1.0,
         "swe-2": 1.0
       },
       "discriminates": false,
       "n": {
-        "deepseek-v4.1-flash": 3,
+        "deepseek-4-1-flash": 3,
         "swe-2": 3
       },
       "p50": {
-        "deepseek-v4.1-flash": 3.9,
+        "deepseek-4-1-flash": 3.9,
         "swe-2": 6.6
       },
       "p90": {
-        "deepseek-v4.1-flash": 8.4,
+        "deepseek-4-1-flash": 8.4,
         "swe-2": 6.6
       },
       "tier": "fast",
@@ -107,31 +107,31 @@
     },
     "cancel-async-tasks": {
       "band": {
-        "deepseek-v4.1-flash": 1.0,
-        "haiku-5.5": 0.5,
+        "deepseek-4-1-flash": 1.0,
+        "haiku-5-5": 0.5,
         "swe-2": 1.0,
         "swe-2-flash": 0.429
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0,
-        "haiku-5.5": 0.5,
+        "deepseek-4-1-flash": 1.0,
+        "haiku-5-5": 0.5,
         "swe-2": 1.0,
         "swe-2-flash": 0.429
       },
       "discriminates": true,
       "n": {
-        "deepseek-v4.1-flash": 3,
-        "haiku-5.5": 2,
+        "deepseek-4-1-flash": 3,
+        "haiku-5-5": 2,
         "swe-2": 11,
         "swe-2-flash": 7
       },
       "p50": {
-        "deepseek-v4.1-flash": 4.3,
+        "deepseek-4-1-flash": 4.3,
         "swe-2": 4.9,
         "swe-2-flash": 4.5
       },
       "p90": {
-        "deepseek-v4.1-flash": 6.7,
+        "deepseek-4-1-flash": 6.7,
         "swe-2": 9.4,
         "swe-2-flash": 8.2
       },
@@ -188,28 +188,28 @@
     },
     "feal-linear-cryptanalysis": {
       "band": {
-        "deepseek-v4.1-flash": 1.0,
+        "deepseek-4-1-flash": 1.0,
         "swe-2": 0.625,
         "swe-2-flash": 0.6
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0,
+        "deepseek-4-1-flash": 1.0,
         "swe-2": 0.625,
         "swe-2-flash": 0.6
       },
       "discriminates": true,
       "n": {
-        "deepseek-v4.1-flash": 2,
+        "deepseek-4-1-flash": 2,
         "swe-2": 8,
         "swe-2-flash": 5
       },
       "p50": {
-        "deepseek-v4.1-flash": 9.9,
+        "deepseek-4-1-flash": 9.9,
         "swe-2": 10.0,
         "swe-2-flash": 19.6
       },
       "p90": {
-        "deepseek-v4.1-flash": 19.9,
+        "deepseek-4-1-flash": 19.9,
         "swe-2": 10.2,
         "swe-2-flash": 29.7
       },
@@ -339,40 +339,40 @@
     },
     "nginx-request-logging": {
       "band": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "discriminates": false,
       "n": {
-        "deepseek-v4.1-flash": 4
+        "deepseek-4-1-flash": 4
       },
       "p50": {
-        "deepseek-v4.1-flash": 2.4
+        "deepseek-4-1-flash": 2.4
       },
       "p90": {
-        "deepseek-v4.1-flash": 2.9
+        "deepseek-4-1-flash": 2.9
       },
       "tier": "fast",
       "worst_p90": 2.9
     },
     "openssl-selfsigned-cert": {
       "band": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "discriminates": false,
       "n": {
-        "deepseek-v4.1-flash": 4
+        "deepseek-4-1-flash": 4
       },
       "p50": {
-        "deepseek-v4.1-flash": 2.5
+        "deepseek-4-1-flash": 2.5
       },
       "p90": {
-        "deepseek-v4.1-flash": 2.5
+        "deepseek-4-1-flash": 2.5
       },
       "tier": "fast",
       "worst_p90": 2.5
@@ -402,20 +402,20 @@
     },
     "polyglot-c-py": {
       "band": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "discriminates": false,
       "n": {
-        "deepseek-v4.1-flash": 4
+        "deepseek-4-1-flash": 4
       },
       "p50": {
-        "deepseek-v4.1-flash": 4.1
+        "deepseek-4-1-flash": 4.1
       },
       "p90": {
-        "deepseek-v4.1-flash": 8.1
+        "deepseek-4-1-flash": 8.1
       },
       "tier": "fast",
       "worst_p90": 8.1
@@ -447,28 +447,28 @@
     },
     "regex-log": {
       "band": {
-        "deepseek-v4.1-flash": 0.889,
+        "deepseek-4-1-flash": 0.889,
         "swe-2": 1.0,
         "swe-2-flash": 1.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 0.889,
+        "deepseek-4-1-flash": 0.889,
         "swe-2": 1.0,
         "swe-2-flash": 1.0
       },
       "discriminates": true,
       "n": {
-        "deepseek-v4.1-flash": 9,
+        "deepseek-4-1-flash": 9,
         "swe-2": 4,
         "swe-2-flash": 2
       },
       "p50": {
-        "deepseek-v4.1-flash": 3.1,
+        "deepseek-4-1-flash": 3.1,
         "swe-2": 3.0,
         "swe-2-flash": 3.6
       },
       "p90": {
-        "deepseek-v4.1-flash": 3.7,
+        "deepseek-4-1-flash": 3.7,
         "swe-2": 6.9,
         "swe-2-flash": 5.6
       },
@@ -502,28 +502,28 @@
     },
     "sparql-university": {
       "band": {
-        "deepseek-v4.1-flash": 1.0,
+        "deepseek-4-1-flash": 1.0,
         "swe-2": 1.0,
         "swe-2-flash": 0.727
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0,
+        "deepseek-4-1-flash": 1.0,
         "swe-2": 1.0,
         "swe-2-flash": 0.727
       },
       "discriminates": true,
       "n": {
-        "deepseek-v4.1-flash": 2,
+        "deepseek-4-1-flash": 2,
         "swe-2": 13,
         "swe-2-flash": 11
       },
       "p50": {
-        "deepseek-v4.1-flash": 3.3,
+        "deepseek-4-1-flash": 3.3,
         "swe-2": 5.1,
         "swe-2-flash": 6.2
       },
       "p90": {
-        "deepseek-v4.1-flash": 7.2,
+        "deepseek-4-1-flash": 7.2,
         "swe-2": 13.4,
         "swe-2-flash": 8.7
       },
@@ -532,20 +532,20 @@
     },
     "sqlite-db-truncate": {
       "band": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "band_honest": {
-        "deepseek-v4.1-flash": 1.0
+        "deepseek-4-1-flash": 1.0
       },
       "discriminates": false,
       "n": {
-        "deepseek-v4.1-flash": 4
+        "deepseek-4-1-flash": 4
       },
       "p50": {
-        "deepseek-v4.1-flash": 3.6
+        "deepseek-4-1-flash": 3.6
       },
       "p90": {
-        "deepseek-v4.1-flash": 4.8
+        "deepseek-4-1-flash": 4.8
       },
       "tier": "fast",
       "worst_p90": 4.8
