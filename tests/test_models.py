@@ -146,20 +146,18 @@ class AmpModelTableTest(unittest.TestCase):
                 self.assertIn(key, AmpAgent.MODE_SPECS)
 
     def test_plugin_registers_every_mode(self):
-        """Amp selects modes by label, so the uploaded plugin must match MODE_SPECS."""
-        plugin = AmpAgent.PLUGIN_SOURCE
+        """The uploaded plugin names every mode by its registry key."""
+        plugin = AmpAgent.plugin_source()
         for key, spec in AmpAgent.MODE_SPECS.items():
             with self.subTest(key=key):
-                self.assertIn(f"label: '{spec['label']}'", plugin)
+                self.assertIn(f"key: 'fh-{key}'", plugin)
+                self.assertIn(f"label: '{key}'", plugin)
                 self.assertIn(f"model: '{spec['model']}'", plugin)
                 self.assertIn(
                     f"reasoningEffort: '{spec['effort']}'", plugin
                 )
-                self.assertIn(f'"label":"{spec["label"]}"', plugin)
-
-    def test_mode_labels_are_unique(self):
-        labels = [spec["label"] for spec in AmpAgent.MODE_SPECS.values()]
-        self.assertEqual(len(labels), len(set(labels)))
+                self.assertIn(f'"key":"fh-{key}"', plugin)
+                self.assertIn(f'"label":"{key}"', plugin)
 
 
 class ClaudeMetadataTest(unittest.TestCase):

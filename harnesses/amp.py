@@ -81,73 +81,61 @@ class AmpAgent(BaseInstalledAgent):
 
     MODE_SPECS: ClassVar[dict[AmpModel, dict[str, str]]] = {
         "deepseek-flash-high": {
-            "label": "DV DS Flash 4.1 high",
             "model": "devin/deepseek-v4.1-flash-high",
             "effort": "high",
             "color": "#10b981",
         },
         "deepseek-flash-max": {
-            "label": "DV DS Flash 4.1 max",
             "model": "devin/deepseek-v4.1-flash-max",
             "effort": "max",
             "color": "#10b981",
         },
         "deepseek-engy-high": {
-            "label": "Engy DS Flash 4.1 high",
             "model": "engy/deepseek-v4.1-flash-1017(high)",
             "effort": "high",
             "color": "#0ea5e9",
         },
         "deepseek-engy-max": {
-            "label": "Engy DS Flash 4.1 max",
             "model": "engy/deepseek-v4.1-flash-1017(max)",
             "effort": "max",
             "color": "#0ea5e9",
         },
         "haiku-amp-native": {
-            "label": "Amp Claude Haiku 5.5 max",
             "model": "anthropic/claude-haiku-5-5",
             "effort": "max",
             "color": "#f97316",
         },
         "haiku-devin-max": {
-            "label": "DV Haiku 5.5 max",
             "model": "devin/haiku-5-5-max",
             "effort": "max",
             "color": "#f59e0b",
         },
         "swe-2-max": {
-            "label": "DV SWE-2 max",
             "model": "devin/swe-2-max",
             "effort": "max",
             "color": "#7c3aed",
         },
         "swe-2-high": {
-            "label": "DV SWE-2 high",
             "model": "devin/swe-2-high",
             "effort": "high",
             "color": "#7c3aed",
         },
         "swe-2-flash-max": {
-            "label": "DV SWE-2 Flash max",
             "model": "devin/swe-2-flash-max",
             "effort": "max",
             "color": "#a855f7",
         },
         "swe-2-flash-high": {
-            "label": "DV SWE-2 Flash high",
             "model": "devin/swe-2-flash-high",
             "effort": "high",
             "color": "#a855f7",
         },
         "swe-2-1-xhigh": {
-            "label": "DV SWE-2.1 xhigh",
             "model": "devin/swe-2-1-xhigh",
             "effort": "xhigh",
             "color": "#dc2626",
         },
         "swe-2-1-max": {
-            "label": "DV SWE-2.1 max",
             "model": "devin/swe-2-1-max",
             "effort": "max",
             "color": "#dc2626",
@@ -159,131 +147,11 @@ class AmpAgent(BaseInstalledAgent):
         "max": "deepseek-flash-max",
     }
 
-    PLUGIN_SOURCE = r'''
-// @amp-agent-mode {"key":"fh-devin-ds-high","label":"DV DS Flash 4.1 high","color":"#10b981"}
-// @amp-agent-mode {"key":"fh-devin-ds-max","label":"DV DS Flash 4.1 max","color":"#10b981"}
-// @amp-agent-mode {"key":"fh-engy-ds-high","label":"Engy DS Flash 4.1 high","color":"#0ea5e9"}
-// @amp-agent-mode {"key":"fh-engy-ds-max","label":"Engy DS Flash 4.1 max","color":"#0ea5e9"}
-// @amp-agent-mode {"key":"fh-amp-haiku-max","label":"Amp Claude Haiku 5.5 max","color":"#f97316"}
-// @amp-agent-mode {"key":"fh-devin-haiku-max","label":"DV Haiku 5.5 max","color":"#f59e0b"}
-// @amp-agent-mode {"key":"fh-devin-swe2-max","label":"DV SWE-2 max","color":"#7c3aed"}
-// @amp-agent-mode {"key":"fh-devin-swe2-high","label":"DV SWE-2 high","color":"#7c3aed"}
-// @amp-agent-mode {"key":"fh-devin-swe2-flash-max","label":"DV SWE-2 Flash max","color":"#a855f7"}
-// @amp-agent-mode {"key":"fh-devin-swe2-flash-high","label":"DV SWE-2 Flash high","color":"#a855f7"}
-// @amp-agent-mode {"key":"fh-devin-swe21-xhigh","label":"DV SWE-2.1 xhigh","color":"#dc2626"}
-// @amp-agent-mode {"key":"fh-devin-swe21-max","label":"DV SWE-2.1 max","color":"#dc2626"}
-
+    PLUGIN_RUNTIME = r'''
 import type { PluginAPI } from '@ampcode/plugin'
 
 const modes = [
-  {
-    key: 'fh-devin-ds-high',
-    label: 'DV DS Flash 4.1 high',
-    color: '#10b981',
-    agent: {
-      model: 'devin/deepseek-v4.1-flash-high',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-devin-ds-max',
-    label: 'DV DS Flash 4.1 max',
-    color: '#10b981',
-    agent: {
-      model: 'devin/deepseek-v4.1-flash-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-engy-ds-high',
-    label: 'Engy DS Flash 4.1 high',
-    color: '#0ea5e9',
-    agent: {
-      model: 'engy/deepseek-v4.1-flash-1017(high)',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-engy-ds-max',
-    label: 'Engy DS Flash 4.1 max',
-    color: '#0ea5e9',
-    agent: {
-      model: 'engy/deepseek-v4.1-flash-1017(max)',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-amp-haiku-max',
-    label: 'Amp Claude Haiku 5.5 max',
-    color: '#f97316',
-    agent: {
-      model: 'anthropic/claude-haiku-5-5',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-haiku-max',
-    label: 'DV Haiku 5.5 max',
-    color: '#f59e0b',
-    agent: {
-      model: 'devin/haiku-5-5-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-max',
-    label: 'DV SWE-2 max',
-    color: '#7c3aed',
-    agent: {
-      model: 'devin/swe-2-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-high',
-    label: 'DV SWE-2 high',
-    color: '#7c3aed',
-    agent: {
-      model: 'devin/swe-2-high',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-flash-max',
-    label: 'DV SWE-2 Flash max',
-    color: '#a855f7',
-    agent: {
-      model: 'devin/swe-2-flash-max',
-      reasoningEffort: 'max',
-    },
-  },
-  {
-    key: 'fh-devin-swe2-flash-high',
-    label: 'DV SWE-2 Flash high',
-    color: '#a855f7',
-    agent: {
-      model: 'devin/swe-2-flash-high',
-      reasoningEffort: 'high',
-    },
-  },
-  {
-    key: 'fh-devin-swe21-xhigh',
-    label: 'DV SWE-2.1 xhigh',
-    color: '#dc2626',
-    agent: {
-      model: 'devin/swe-2-1-xhigh',
-      reasoningEffort: 'xhigh',
-    },
-  },
-  {
-    key: 'fh-devin-swe21-max',
-    label: 'DV SWE-2.1 max',
-    color: '#dc2626',
-    agent: {
-      model: 'devin/swe-2-1-max',
-      reasoningEffort: 'max',
-    },
-  },
+__MODES__
 ] as const
 
 export default function (amp: PluginAPI) {
@@ -305,6 +173,33 @@ export default function (amp: PluginAPI) {
   }
 }
 '''
+
+    @classmethod
+    def plugin_source(cls) -> str:
+        """The TS plugin, generated so keys and labels cannot drift."""
+        comments: list[str] = []
+        modes: list[str] = []
+        for key, spec in cls.MODE_SPECS.items():
+            comments.append(
+                f'// @amp-agent-mode {{"key":"fh-{key}","label":"{key}",'
+                f'"color":"{spec["color"]}"}}'
+            )
+            modes.append(
+                "  {\n"
+                f"    key: 'fh-{key}',\n"
+                f"    label: '{key}',\n"
+                f"    color: '{spec['color']}',\n"
+                "    agent: {\n"
+                f"      model: '{spec['model']}',\n"
+                f"      reasoningEffort: '{spec['effort']}',\n"
+                "    },\n"
+                "  },"
+            )
+        return (
+            "\n".join(comments)
+            + "\n\n"
+            + cls.PLUGIN_RUNTIME.replace("__MODES__", "\n".join(modes))
+        )
 
     DEFAULT_VERSION = "latest"
     DEFAULT_SETUP_TIMEOUT_SEC = 1200.0
@@ -459,7 +354,7 @@ export default function (amp: PluginAPI) {
         await upload_text(
             self,
             environment,
-            content=self.PLUGIN_SOURCE,
+            content=self.plugin_source(),
             remote_path=plugin_path,
             filename=self.PLUGIN_FILENAME,
         )
@@ -478,7 +373,6 @@ export default function (amp: PluginAPI) {
         _, api_key = require_env(self, "AMP_API_KEY")
         workdir = await resolve_workdir(self, environment)
         spec = self.MODE_SPECS[self.model]
-        label = spec["label"]
         log_dir = str(self.environment_logs_dir)
         log_file = f"{log_dir}/amp.txt"
 
@@ -501,10 +395,9 @@ export default function (amp: PluginAPI) {
             "then echo 'Error: Connection error.' >&2; exit 1; fi"
         )
         self.logger.info(
-            "Running Amp Code with effort=%s model_key=%s mode=%s",
+            "Running Amp Code with effort=%s model_key=%s",
             self.effort,
             self.model,
-            label,
         )
         await self.exec_as_agent(
             environment,
@@ -525,7 +418,7 @@ export default function (amp: PluginAPI) {
             **(context.metadata or {}),
             "harness": "amp-code",
             "effort": self.effort,
-            "mode": spec["label"],
+            "mode": self.model,
             "model": spec["model"],
             "model_key": self.model,
         }
