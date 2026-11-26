@@ -19,7 +19,7 @@ from typing import Any
 from unittest import mock
 
 from viewer_overlay import app as overlay_app
-from viewer_overlay import launch, registry, runner, static_build
+from viewer_overlay import columns, harbor_api, launch, registry, runner, static_build
 from viewer_overlay.middleware import OverlayJSONMiddleware, eligible
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -501,6 +501,12 @@ class StaticBuildTest(unittest.TestCase):
         self.source = self.root / "static"
         (self.source / "assets").mkdir(parents=True)
         (self.source / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
+        (self.source / "assets" / "home-TEST.js").write_text(
+            '{accessorKey:"total_cost_usd",header:', encoding="utf-8"
+        )
+        (self.source / "assets" / "rollouts-table-TEST.js").write_text(
+            '{accessorKey:"cost_usd",header:', encoding="utf-8"
+        )
         (self.source / "index.html").write_text(
             '<html><body><div id="app"></div></body></html>', encoding="utf-8"
         )
@@ -523,6 +529,12 @@ class StaticBuildTest(unittest.TestCase):
             (self.target / "index.html").read_text(encoding="utf-8").count(static_build.NAV_TAG), 1
         )
 
+    def test_the_built_copy_gets_the_total_column(self):
+        static_build.build(self.target, self.source)
+        self.assertEqual(columns.verify(self.target / "assets"), [])
+        source_home = (self.source / "assets" / "home-TEST.js").read_text(encoding="utf-8")
+        self.assertNotIn('accessorKey:"total_all_tokens"', source_home)
+
     def test_a_changed_bundle_rebuilds(self):
         static_build.build(self.target, self.source)
         (self.source / "assets" / "app.js").write_text("console.log(2)", encoding="utf-8")
@@ -538,6 +550,19 @@ class StaticBuildTest(unittest.TestCase):
             static_build.build(self.target, self.source)
         self.assertIn(static_build.harbor_version(), str(caught.exception))
         self.assertIn("</body>", str(caught.exception))
+
+
+class HarborAdapterTest(unittest.TestCase):
+    """The installed Harbor is checked in one place before the app is built."""
+
+    def test_the_installed_harbor_is_supported(self):
+        self.assertEqual(harbor_api.ensure_supported(), harbor_api.installed_version())
+
+    def test_a_newer_minor_names_the_fix(self):
+        with self.assertRaises(harbor_api.HarborAPIError) as caught:
+            harbor_api.ensure_supported("0.27.0")
+        self.assertIn("0.26", str(caught.exception))
+        self.assertIn("harbor_api.py", str(caught.exception))
 
 
 class AppRoutesTest(unittest.TestCase):

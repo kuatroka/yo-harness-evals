@@ -1,10 +1,10 @@
-"""Build the viewer's static directory, with the overlay's nav injected.
+"""Build the viewer's static directory, with the overlay's changes applied.
 
 Harbor ships a compiled SvelteKit bundle. Rather than patch it in site-packages,
-this copies it to `.viewer_static/` beside the repo and appends one script tag,
-so a Harbor upgrade rebuilds from the new bundle instead of fighting an old
-patch. The copy is skipped whenever the source bundle is byte-identical to the
-one already built.
+this copies it to `.viewer_static/` beside the repo, adds the Total column and
+appends one script tag, so a Harbor upgrade rebuilds from the new bundle instead
+of fighting an old patch. The copy is skipped whenever the source bundle and the
+column patch are identical to the ones already built.
 """
 
 from __future__ import annotations
@@ -12,8 +12,9 @@ from __future__ import annotations
 import hashlib
 import shutil
 from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from . import columns, harbor_api
 
 INDEX = "index.html"
 STATE_FILE = ".overlay-source"
@@ -37,10 +38,10 @@ def build(
     *,
     force: bool = False,
 ) -> BuildResult:
-    """Copy the bundle into `target` and inject the nav script once."""
+    """Copy the bundle into `target` and apply the overlay's edits once."""
     harbor = harbor_version()
     source = Path(source) if source is not None else default_source()
-    fingerprint = source_fingerprint(source)
+    fingerprint = source_fingerprint(source) + "\0" + columns.VERSION
     index = target / INDEX
     state = target / STATE_FILE
 
@@ -53,6 +54,7 @@ def build(
         raise StaticBuildError(
             f"cannot inject the overlay nav: {source} has no {INDEX} (harbor {harbor})"
         )
+    columns.apply(target / "assets", harbor)
     html = index.read_text(encoding="utf-8")
     index.write_text(inject_nav(html, str(index), harbor), encoding="utf-8")
     # The stamp is written last, so a copy that was interrupted rebuilds next time.
@@ -88,16 +90,11 @@ def source_fingerprint(source: Path) -> str:
 
 
 def harbor_version() -> str:
-    try:
-        return version("harbor")
-    except PackageNotFoundError:
-        return "unknown"
+    return harbor_api.installed_version()
 
 
 def default_source() -> Path:
-    from harbor.cli.view import STATIC_DIR
-
-    return Path(STATIC_DIR)
+    return harbor_api.static_dir()
 
 
 def _stamp(path: Path) -> str | None:

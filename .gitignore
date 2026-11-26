@@ -10,6 +10,8 @@ archive/
 .audit/
 .viewer_static/
 .pytest_cache/
+dist/
+build/
 *.log
 *.egg-info/
 .DS_Store
