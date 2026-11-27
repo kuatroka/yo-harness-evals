@@ -271,5 +271,18 @@
     "provider": "anthropic",
     "route": "claude-opus-5-5",
     "notes": "Claude Code's native Anthropic route over the subscription OAuth token. Effort travels as reasoning_effort."
+  },
+  "native/amp/opus-5-5-high": {
+    "transport": "native",
+    "endpoint": "amp",
+    "model": "opus-5-5",
+    "effort": "high",
+    "base": "opus-5-5",
+    "harnesses": [
+      "amp"
+    ],
+    "provider": "anthropic",
+    "route": "anthropic/claude-opus-5-5",
+    "notes": "Amp's own Claude access, no 9Router and no Devin bridge."
   }
 }

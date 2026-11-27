@@ -176,6 +176,10 @@ class OpusRegistryTest(unittest.TestCase):
             lib.resolve_model("claude-opus-5-5", models, "medium"),
             "native/claude/opus-5-5-medium",
         )
+        self.assertEqual(
+            lib.resolve_model("anthropic/claude-opus-5-5", models, "high"),
+            "native/amp/opus-5-5-high",
+        )
 
 
 class ClaudeMetadataTest(unittest.TestCase):
