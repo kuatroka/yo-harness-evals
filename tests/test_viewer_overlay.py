@@ -398,14 +398,20 @@ class StatusTest(unittest.TestCase):
         )
 
     def test_job_states_and_launch_status(self):
+        # ui-a-live has a live docker container for its trial, so it is running.
         self.job("ui-a-live", None)
+        trial = self.root / "jobs" / "ui-a-live" / "wal-recovery-ordering__abc1234"
+        trial.mkdir()
         self.job("ui-a-done", {"finished_at": "2026-01-01T00:00:00Z", "stats": {"n_errored_trials": 0}})
         self.job("ui-a-bad", {"finished_at": "2026-01-01T00:00:00Z", "stats": {"n_errored_trials": 2}})
         self.job("ui-b-done", {"finished_at": "2026-01-01T00:00:00Z", "stats": {"n_errored_trials": 0}})
         self.record("a", "ui-a", "2026-01-01T00:00:00Z")
         self.record("b", "ui-b", "2026-01-02T00:00:00Z")
 
-        launches = runner.list_launches(repo_root=self.root)
+        with mock.patch.object(
+            runner, "_live_trial_containers", return_value={"wal-recovery-ordering__abc1234"}
+        ):
+            launches = runner.list_launches(repo_root=self.root)
         by_id = {entry["launch_id"]: entry for entry in launches}
         self.assertEqual([entry["launch_id"] for entry in launches], ["b", "a"])
         self.assertEqual(by_id["a"]["status"], "running")
@@ -414,6 +420,35 @@ class StatusTest(unittest.TestCase):
             {"ui-a-live": "running", "ui-a-done": "completed", "ui-a-bad": "failed"},
         )
         self.assertEqual(by_id["b"]["status"], "completed")
+
+    def test_a_job_with_no_finished_at_and_no_live_container_is_stalled(self):
+        # The runner died before writing finished_at: nothing is alive any more,
+        # so this is stalled, not running.
+        self.job("ui-c-stuck", None)
+        (self.root / "jobs" / "ui-c-stuck" / "wal-recovery-ordering__dead999").mkdir()
+        self.record("c", "ui-c", "2026-01-03T00:00:00Z")
+        with mock.patch.object(runner, "_live_trial_containers", return_value=set()):
+            launches = runner.list_launches(repo_root=self.root)
+        by_id = {entry["launch_id"]: entry for entry in launches}
+        self.assertEqual(by_id["c"]["jobs"][0]["state"], "stalled")
+        self.assertEqual(by_id["c"]["status"], "stalled")
+
+    def test_a_dry_run_launch_is_dry_run_not_pending(self):
+        path = self.root / "logs" / "launches" / "dry.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "launch_id": "dry",
+                    "created_at": "2026-01-04T00:00:00Z",
+                    "spec": {"agent": "codex", "tasks": []},
+                    "job_prefix": "ui-dry",
+                    "dry_run": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+        launches = runner.list_launches(repo_root=self.root)
+        self.assertEqual(launches[0]["status"], "dry-run")
 
     def test_a_launch_with_no_job_folder_is_pending(self):
         self.record("c", "ui-c", "2026-01-03T00:00:00Z")
@@ -971,7 +1006,7 @@ class AppRoutesTest(unittest.TestCase):
         self.assertEqual(len(launches), before + 1)
         listed = launches[0]
         self.assertEqual(listed["launch_id"], created["launch_id"])
-        self.assertEqual(listed["status"], "pending")
+        self.assertEqual(listed["status"], "dry-run")
         self.assertEqual(listed["jobs"], [])
         self.assertEqual(
             listed["spec"]["model"], "9r/dv-bridge/swe-2-1-max"

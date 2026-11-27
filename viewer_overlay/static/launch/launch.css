@@ -322,6 +322,14 @@ button.ghost:hover {
   color: var(--warn);
 }
 
+.status.stalled {
+  color: var(--warn);
+}
+
+.status.dry-run {
+  color: var(--muted);
+}
+
 .jobs {
   color: var(--muted);
   font-size: 0.8rem;

@@ -131,9 +131,15 @@ def write_record(path: Path, record: dict[str, Any]) -> bool:
 
 
 def list_launches(repo_root: Path = REPO_ROOT) -> list[dict[str, Any]]:
-    """Every launch record, with its jobs' state read fresh from disk."""
+    """Every launch record, with its jobs' state read fresh from disk.
+
+    A dry run spawns nothing, so it never has job folders. Reporting it as
+    "pending" would wait forever for a run that was never meant to start, so
+    it is labeled "dry-run" instead of a real launch status.
+    """
     logs_dir = repo_root / LOGS_DIR
     jobs_dir = repo_root / JOBS_DIR
+    live_containers = _live_trial_containers()
     launches: list[dict[str, Any]] = []
     for path in sorted((logs_dir / LAUNCHES_DIR).glob("*.json")):
         record = _read_json(path)
@@ -146,16 +152,20 @@ def list_launches(repo_root: Path = REPO_ROOT) -> list[dict[str, Any]]:
             else []
         )
         jobs = [
-            {"job_name": job_dir.name, "state": job_state(job_dir)}
+            {"job_name": job_dir.name, "state": job_state(job_dir, live_containers)}
             for job_dir in job_dirs
             if job_dir.is_dir()
         ]
+        if record.get("dry_run"):
+            status = "dry-run"
+        else:
+            status = launch_status([job["state"] for job in jobs])
         launches.append(
             {
                 "launch_id": record.get("launch_id", path.stem),
                 "created_at": record.get("created_at"),
                 "spec": record.get("spec"),
-                "status": launch_status([job["state"] for job in jobs]),
+                "status": status,
                 "jobs": jobs,
             }
         )
@@ -163,14 +173,65 @@ def list_launches(repo_root: Path = REPO_ROOT) -> list[dict[str, Any]]:
     return launches
 
 
-def job_state(job_dir: Path) -> str:
-    """Read one job directory. Harbor writes result.json at start, then fills it."""
+def job_state(job_dir: Path, live_containers: set[str] | None = None) -> str:
+    """Read one job directory. Harbor writes result.json at start, then fills it.
+
+    A job with no finished_at is only "running" while something is actually
+    alive. The runner is one long-lived process per trial inside a docker
+    container, and it writes nothing to the host job dir until the trial ends,
+    so file mtimes cannot tell a live job from one whose runner died. The
+    container can: a finished_at-less job with no live trial container is
+    "stalled", not running.
+    """
     result = _read_json(job_dir / "result.json")
-    if not isinstance(result, dict) or not result.get("finished_at"):
+    if isinstance(result, dict) and result.get("finished_at"):
+        stats = result.get("stats")
+        errored = stats.get("n_errored_trials") if isinstance(stats, dict) else 0
+        return "failed" if errored else "completed"
+    if live_containers is None:
+        live_containers = _live_trial_containers()
+    if _has_live_trial(job_dir, live_containers):
         return "running"
-    stats = result.get("stats")
-    errored = stats.get("n_errored_trials") if isinstance(stats, dict) else 0
-    return "failed" if errored else "completed"
+    return "stalled"
+
+def _trial_container_fragment(trial_name: str) -> str:
+    """Docker lowercases the compose project, so the trial id is matched lowercase."""
+    return trial_name.lower()
+
+def _has_live_trial(job_dir: Path, live_containers: set[str]) -> bool:
+    if not live_containers:
+        return False
+    for child in job_dir.iterdir():
+        if not child.is_dir() or "__" not in child.name:
+            continue
+        if _trial_container_fragment(child.name) in live_containers:
+            return True
+    return False
+
+def _live_trial_containers() -> set[str]:
+    """The lowercase trial fragments of every running harness container.
+
+    Containers are named `<task>__<trialid>__env-main-1`. A fragment is the
+    `<task>__<trialid>` part. Docker unreachable or no containers yields an
+    empty set, which job_state reads as nothing live.
+    """
+    try:
+        out = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if out.returncode != 0:
+        return set()
+    fragments: set[str] = set()
+    for line in out.stdout.splitlines():
+        name = line.strip()
+        if name.endswith("__env-main-1"):
+            fragments.add(name[: -len("__env-main-1")])
+    return fragments
 
 
 def launch_status(states: list[str]) -> str:
@@ -178,6 +239,8 @@ def launch_status(states: list[str]) -> str:
         return "pending"
     if any(state == "running" for state in states):
         return "running"
+    if any(state == "stalled" for state in states):
+        return "stalled"
     if any(state == "failed" for state in states):
         return "failed"
     return "completed"
