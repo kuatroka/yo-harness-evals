@@ -867,6 +867,16 @@ class AppRoutesTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200, path)
             self.assertTrue(response.headers["content-type"].startswith(kind), (path, response.headers))
 
+    def test_run_redirects_to_the_launch_page_with_the_source_job(self):
+        response = self.client.get("/run?from=fixture-job", follow_redirects=False)
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(response.headers["location"], "/launch?from=fixture-job")
+
+    def test_run_without_a_source_job_redirects_to_the_blank_launch_page(self):
+        response = self.client.get("/run", follow_redirects=False)
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(response.headers["location"], "/launch")
+
     def test_options_lists_agents_models_efforts_and_tasks(self):
         payload = self.client.get("/api/overlay/options").json()
         self.assertEqual([agent["id"] for agent in payload["agents"]], ["amp", "claude", "codex", "droid"])

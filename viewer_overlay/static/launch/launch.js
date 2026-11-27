@@ -406,6 +406,11 @@
     $("load-job").addEventListener("click", loadJob);
 
     await fillJobNames();
+    const fromJob = new URLSearchParams(window.location.search).get("from")?.trim();
+    if (fromJob) {
+      $("from-job").value = fromJob;
+      await loadJob();
+    }
     await refreshLaunches();
     state.launchTimer = window.setInterval(() => {
       if (!document.hidden) refreshLaunches();

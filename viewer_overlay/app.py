@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 
 from . import harbor_api, launch as specs
 from . import registry, runner, static_build
@@ -118,6 +123,16 @@ def _overlay_router(
     def list_launches() -> list[dict[str, Any]]:
         return runner.list_launches(repo_root=repo_root)
 
+    # Harbor's own /run form builds its agent picker from its built-in agents,
+    # so Amp and Droid are missing there. The overlay form builds from the
+    # registry. Send both blank runs and job reruns to the registry-aware page.
+    @router.get("/run")
+    def run_page(request: Request) -> RedirectResponse:
+        target = "/launch"
+        if request.url.query:
+            target = f"{target}?{request.url.query}"
+        return RedirectResponse(target, status_code=307)
+
     @router.get("/launch")
     def launch_page() -> FileResponse:
         return FileResponse(LAUNCH_PAGE / "index.html", media_type="text/html")
@@ -133,7 +148,9 @@ def _overlay_router(
     @router.get("/overlay/nav.js")
     def nav_script() -> PlainTextResponse:
         return PlainTextResponse(
-            static_build.NAV_JS, media_type="application/javascript"
+            static_build.NAV_JS,
+            media_type="application/javascript",
+            headers={"cache-control": "no-store"},
         )
 
     return router

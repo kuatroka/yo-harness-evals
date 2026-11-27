@@ -19,7 +19,8 @@ from . import columns, harbor_api
 INDEX = "index.html"
 STATE_FILE = ".overlay-source"
 CLOSING_TAG = "</body>"
-NAV_TAG = '<script src="/overlay/nav.js" defer></script>'
+NAV_VERSION = "2"
+NAV_TAG = f'<script src="/overlay/nav.js?v={NAV_VERSION}" defer></script>'
 
 
 class StaticBuildError(RuntimeError):
@@ -41,7 +42,9 @@ def build(
     """Copy the bundle into `target` and apply the overlay's edits once."""
     harbor = harbor_version()
     source = Path(source) if source is not None else default_source()
-    fingerprint = source_fingerprint(source) + "\0" + columns.VERSION
+    fingerprint = (
+        source_fingerprint(source) + "\0" + columns.VERSION + "\0" + NAV_VERSION
+    )
     index = target / INDEX
     state = target / STATE_FILE
 
@@ -108,6 +111,7 @@ NAV_JS = r"""(() => {
   "use strict";
 
   const HREF = "/launch";
+  const RUN_PATH = "/run";
   const LABEL = "New run";
   const LINK_ID = "overlay-new-run";
   const MENU = '[data-slot="sidebar-menu"]';
@@ -120,6 +124,26 @@ NAV_JS = r"""(() => {
     "position:fixed;top:.75rem;right:.75rem;z-index:2147483647;padding:.45rem .8rem;" +
     "border-radius:.5rem;font:500 13px/1 system-ui,-apple-system,sans-serif;" +
     "text-decoration:none;background:#2563eb;color:#fff;box-shadow:0 2px 8px rgb(0 0 0 / 25%);";
+
+  function launchFromRunLink(event) {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = event.target;
+    const anchor = target && target.closest ? target.closest("a[href]") : null;
+    if (!anchor) return;
+    if (anchor.target && anchor.target !== "_self") return;
+    if (anchor.hasAttribute("download")) return;
+    const url = new URL(anchor.href, window.location.origin);
+    if (url.pathname !== RUN_PATH) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.location.assign(HREF + url.search);
+  }
+
+  function launchFromRunPage() {
+    if (window.location.pathname !== RUN_PATH) return;
+    window.location.replace(HREF + window.location.search);
+  }
 
   function ensureStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -176,6 +200,9 @@ NAV_JS = r"""(() => {
   }
 
   function start() {
+    document.addEventListener("click", launchFromRunLink, true);
+    window.addEventListener("popstate", launchFromRunPage);
+    launchFromRunPage();
     install();
     // The SPA hydrates after this script runs. Give the sidebar a moment before
     // falling back to a button the viewer's own chrome does not need.
