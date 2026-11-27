@@ -867,6 +867,17 @@ class AppRoutesTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200, path)
             self.assertTrue(response.headers["content-type"].startswith(kind), (path, response.headers))
 
+    def test_the_shell_and_overlay_scripts_are_not_cached(self):
+        # A stale nav.js or index.html reverts the rerun redirect, so the
+        # documents and overlay scripts revalidate while hashed assets cache.
+        for path in ("/", "/run", "/launch", "/launch/launch.js", "/overlay/nav.js"):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200, path)
+            self.assertIn("no-store", response.headers.get("cache-control", ""), (path, response.headers))
+        for path in ("/launch/launch.css",):
+            response = self.client.get(path)
+            self.assertIn("no-store", response.headers.get("cache-control", ""), path)
+
     def test_run_redirects_to_the_launch_page_with_the_source_job(self):
         response = self.client.get("/run?from=fixture-job", follow_redirects=False)
         self.assertEqual(response.status_code, 307)

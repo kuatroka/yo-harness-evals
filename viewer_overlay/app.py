@@ -133,17 +133,25 @@ def _overlay_router(
             target = f"{target}?{request.url.query}"
         return RedirectResponse(target, status_code=307)
 
+    NO_STORE = {"cache-control": "no-store"}
+
     @router.get("/launch")
     def launch_page() -> FileResponse:
-        return FileResponse(LAUNCH_PAGE / "index.html", media_type="text/html")
+        return FileResponse(
+            LAUNCH_PAGE / "index.html", media_type="text/html", headers=NO_STORE
+        )
 
     @router.get("/launch/launch.js")
     def launch_script() -> FileResponse:
-        return FileResponse(LAUNCH_PAGE / "launch.js", media_type="text/javascript")
+        return FileResponse(
+            LAUNCH_PAGE / "launch.js", media_type="text/javascript", headers=NO_STORE
+        )
 
     @router.get("/launch/launch.css")
     def launch_styles() -> FileResponse:
-        return FileResponse(LAUNCH_PAGE / "launch.css", media_type="text/css")
+        return FileResponse(
+            LAUNCH_PAGE / "launch.css", media_type="text/css", headers=NO_STORE
+        )
 
     @router.get("/overlay/nav.js")
     def nav_script() -> PlainTextResponse:

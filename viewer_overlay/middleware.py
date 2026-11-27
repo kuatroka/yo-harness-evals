@@ -49,6 +49,27 @@ class OverlayJSONMiddleware:
             await self.app(scope, receive, send)
             return
         scope = _rewrite_filter_request(scope)
+
+        # The HTML shell and the overlay's own scripts must never be cached:
+        # a stale nav.js or index.html reverts the rerun redirect and the
+        # agent labels. The immutable hashed assets under /assets/ may cache.
+        path = scope.get("path", "")
+        if _no_store_html(path):
+            inner_send = send
+
+            async def no_store(message: Message) -> None:
+                if message.get("type") == "http.response.start":
+                    headers = [
+                        (k, v)
+                        for k, v in (message.get("headers") or [])
+                        if k.lower() != b"cache-control"
+                    ]
+                    headers.append((b"cache-control", b"no-store"))
+                    message = {**message, "headers": headers}
+                await inner_send(message)
+
+            send = no_store
+
         if not eligible(scope.get("path", "")):
             await self.app(scope, receive, send)
             return
@@ -82,6 +103,21 @@ class OverlayJSONMiddleware:
 
         await self.app(scope, receive, inspect)
 
+
+def _no_store_html(path: str) -> bool:
+    """HTML shells and the overlay scripts must revalidate every load.
+
+    The immutable hashed assets under /assets/ keep their caching; only the
+    documents that reference them and the overlay's own files are pinned here.
+    """
+    if path in ("/launch", "/overlay/nav.js") or path.startswith("/launch/"):
+        return True
+    if path.startswith("/assets/") or path.startswith("/api/"):
+        return False
+    # The SPA serves one HTML shell for /, /run, /jobs/...; everything with no
+    # file extension is that shell.
+    leaf = path.rsplit("/", 1)[-1]
+    return "." not in leaf
 
 def _rewrite_filter_request(scope: Scope) -> Scope:
     """Expand a display agent name into every raw id it stands for."""
