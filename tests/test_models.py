@@ -150,6 +150,33 @@ class AmpModelTableTest(unittest.TestCase):
                 model="swe-2-1-max",
             )
 
+    def test_medium_effort_accepts_opus(self):
+        with tempfile.TemporaryDirectory() as logs:
+            agent = AmpAgent(
+                logs_dir=Path(logs),
+                model_name="anthropic/claude-opus-5-5",
+                effort="medium",
+                model="anthropic/claude-opus-5-5",
+                model_id="native/amp/opus-5-5-medium",
+            )
+        self.assertEqual(agent.effort, "medium")
+        self.assertEqual(agent.model, "anthropic/claude-opus-5-5")
+
+
+class OpusRegistryTest(unittest.TestCase):
+    def test_opus_medium_rows_route_to_native_anthropic(self):
+        import lib
+
+        models = lib.load_config("models")
+        self.assertEqual(
+            lib.resolve_model("anthropic/claude-opus-5-5", models, "medium"),
+            "native/amp/opus-5-5-medium",
+        )
+        self.assertEqual(
+            lib.resolve_model("claude-opus-5-5", models, "medium"),
+            "native/claude/opus-5-5-medium",
+        )
+
 
 class ClaudeMetadataTest(unittest.TestCase):
     def test_effort_is_recorded_beside_the_model_name(self):

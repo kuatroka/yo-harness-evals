@@ -32,7 +32,7 @@ from .common import (
     upload_text,
 )
 
-AmpEffort = Literal["high", "xhigh", "max"]
+AmpEffort = Literal["medium", "high", "xhigh", "max"]
 
 
 class AmpOptions(InstalledAgentOptions):
@@ -72,6 +72,7 @@ class AmpAgent(BaseInstalledAgent):
     capabilities = AgentCapabilities(reasoning_effort=True)
 
     DEFAULT_MODEL_BY_EFFORT: ClassVar[dict[AmpEffort, str]] = {
+        "medium": "devin/swe-2-1-medium",
         "high": "devin/deepseek-v4.1-flash-high",
         "xhigh": "devin/swe-2-1-xhigh",
         "max": "devin/deepseek-v4.1-flash-max",

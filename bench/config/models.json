@@ -245,5 +245,31 @@
     "provider": "anthropic",
     "route": "claude-haiku-5-5",
     "notes": "Effort goes in via reasoning_effort, not the route id."
+  },
+  "native/amp/opus-5-5-medium": {
+    "transport": "native",
+    "endpoint": "amp",
+    "model": "opus-5-5",
+    "effort": "medium",
+    "base": "opus-5-5",
+    "harnesses": [
+      "amp"
+    ],
+    "provider": "anthropic",
+    "route": "anthropic/claude-opus-5-5",
+    "notes": "Amp's own Claude access, no 9Router and no Devin bridge."
+  },
+  "native/claude/opus-5-5-medium": {
+    "transport": "native",
+    "endpoint": "claude",
+    "model": "opus-5-5",
+    "effort": "medium",
+    "base": "opus-5-5",
+    "harnesses": [
+      "claude"
+    ],
+    "provider": "anthropic",
+    "route": "claude-opus-5-5",
+    "notes": "Claude Code's native Anthropic route over the subscription OAuth token. Effort travels as reasoning_effort."
   }
 }

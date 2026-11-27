@@ -871,7 +871,7 @@ class AppRoutesTest(unittest.TestCase):
         payload = self.client.get("/api/overlay/options").json()
         self.assertEqual([agent["id"] for agent in payload["agents"]], ["amp", "claude", "codex", "droid"])
         self.assertEqual(payload["agents"][1]["label"], "Claude Code")
-        self.assertEqual(payload["efforts"], ["high", "max", "xhigh"])
+        self.assertEqual(payload["efforts"], ["high", "max", "medium", "xhigh"])
         self.assertEqual(payload["default_dataset"], "frontier-harness-eval")
         self.assertIn("wal-recovery-ordering", payload["datasets"][0]["tasks"])
         self.assertEqual(payload["datasets"][0]["name"], "frontier-harness-eval")
