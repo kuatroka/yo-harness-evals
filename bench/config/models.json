@@ -284,5 +284,18 @@
     "provider": "anthropic",
     "route": "anthropic/claude-opus-5-5",
     "notes": "Amp's own Claude access, no 9Router and no Devin bridge."
+  },
+  "native/amp/opus-5-5-xhigh": {
+    "transport": "native",
+    "endpoint": "amp",
+    "model": "opus-5-5",
+    "effort": "xhigh",
+    "base": "opus-5-5",
+    "harnesses": [
+      "amp"
+    ],
+    "provider": "anthropic",
+    "route": "anthropic/claude-opus-5-5",
+    "notes": "Amp's own Claude access, no 9Router and no Devin bridge."
   }
 }
