@@ -1,4 +1,7 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from viewer_overlay.display import display_agent_name, display_model_name
 from viewer_overlay.middleware import rewrite_json
@@ -150,6 +153,55 @@ class ResponseBoundaryTest(unittest.TestCase):
             }
         )
         self.assertEqual(trial["model_name"], "claude-haiku-5-5(max)")
+
+    def test_job_model_uses_effort_from_its_trial_config(self):
+        cases = (
+            (
+                "amp-job",
+                "harnesses.amp:AmpAgent",
+                "anthropic/claude-opus-5-5",
+                {"effort": "medium"},
+                "Amp",
+            ),
+            (
+                "claude-job",
+                "harnesses.claude:ClaudeCodeAgent",
+                "claude-opus-5-5",
+                {"reasoning_effort": "medium"},
+                "Claude Code",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            jobs = Path(tmp)
+            for job_name, agent_name, model_name, kwargs, display_agent in cases:
+                trial = jobs / job_name / "task__x"
+                trial.mkdir(parents=True)
+                (trial / "config.json").write_text(
+                    json.dumps(
+                        {
+                            "agent": {
+                                "name": agent_name,
+                                "model_name": model_name,
+                                "kwargs": kwargs,
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                job = rewrite_json(
+                    {
+                        "name": job_name,
+                        "datasets": ["frontier-harness-eval"],
+                        "agents": [display_agent],
+                        "providers": ["anthropic"],
+                        "models": ["claude-opus-5-5"],
+                        "environment_type": "docker",
+                    },
+                    jobs_dir=jobs,
+                )
+                with self.subTest(job=job_name):
+                    self.assertEqual(job["reasoning_effort"], "medium")
+                    self.assertEqual(job["models"], ["claude-opus-5-5(medium)"])
 
 
 if __name__ == "__main__":

@@ -118,9 +118,9 @@ def rewrite_json(value: Any, jobs_dir: Path | None = None) -> Any:
     """Map every label in a payload, and total the token pairs it carries.
 
     A job whose top-level ``config.json`` is missing still has the same facts in
-    its trial configs. When the viewer is given the jobs folder, an empty job
-    summary is filled from those trials before the labels are mapped, so the
-    table never shows a job with blank Source, Agents, or Models.
+    its trial configs. When the viewer is given the jobs folder, a job summary
+    is filled from those trials before the labels are mapped, including its
+    effort, so the table never shows a job with blank Source, Agents, or Models.
     """
     if isinstance(value, dict):
         return _rewrite_mapping(value, jobs_dir)
@@ -166,7 +166,7 @@ def _rewrite_mapping(node: dict[str, Any], jobs_dir: Path | None) -> dict[str, A
 
 def _fill_job_metadata(node: dict[str, Any], jobs_dir: Path) -> dict[str, Any]:
     """Fill a job summary's missing columns from the job's trial configs."""
-    if not _empty_job_summary(node):
+    if not _job_summary(node):
         return node
     name = node.get("name")
     if not isinstance(name, str) or not name:
@@ -184,13 +184,12 @@ def _fill_job_metadata(node: dict[str, Any], jobs_dir: Path) -> dict[str, Any]:
     return filled
 
 
-def _empty_job_summary(node: dict[str, Any]) -> bool:
+def _job_summary(node: dict[str, Any]) -> bool:
     return (
         isinstance(node.get("name"), str)
         and isinstance(node.get("datasets"), list)
         and isinstance(node.get("agents"), list)
         and isinstance(node.get("models"), list)
-        and any(not node.get(key) for key in ("datasets", "agents", "models"))
     )
 
 
@@ -205,6 +204,7 @@ def _trial_metadata(jobs_dir: Path, job_name: str) -> dict[str, Any]:
     providers: set[str] = set()
     models: set[str] = set()
     environments: set[str] = set()
+    efforts: set[str] = set()
 
     for path in sorted(job_dir.glob("*/config.json")):
         try:
@@ -239,13 +239,19 @@ def _trial_metadata(jobs_dir: Path, job_name: str) -> dict[str, Any]:
             else:
                 models.add(model_name)
 
+        kwargs = agent.get("kwargs")
+        if isinstance(kwargs, dict):
+            effort = kwargs.get("effort") or kwargs.get("reasoning_effort")
+            if isinstance(effort, str) and effort:
+                efforts.add(effort.lower())
+
         environment = config.get("environment")
         if isinstance(environment, dict):
             environment_type = environment.get("type")
             if isinstance(environment_type, str) and environment_type:
                 environments.add(environment_type)
 
-    return {
+    metadata: dict[str, Any] = {
         "datasets": sorted(datasets),
         "agents": sorted(agents),
         "providers": sorted(providers),
@@ -254,12 +260,15 @@ def _trial_metadata(jobs_dir: Path, job_name: str) -> dict[str, Any]:
             next(iter(environments)) if len(environments) == 1 else None
         ),
     }
+    if len(efforts) == 1:
+        metadata["reasoning_effort"] = next(iter(efforts))
+    return metadata
 
 
 def _job_dir(jobs_dir: Path, job_name: str) -> Path | None:
     candidate = (jobs_dir / job_name).resolve()
     try:
-        candidate.relative_to(jobs_dir)
+        candidate.relative_to(jobs_dir.resolve())
     except ValueError:
         return None
     return candidate if candidate.is_dir() else None
