@@ -4,12 +4,15 @@
 it. Nothing under site-packages is written: the static bundle is rebuilt into
 `.viewer_static/` from whatever Harbor currently ships.
 
-    python -m viewer_overlay.app --jobs jobs --port 8099
+    uv run harbor-yo-overlay --jobs jobs --port 8080
 """
 
 from __future__ import annotations
 
 import argparse
+import http.client
+import sys
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -226,12 +229,38 @@ def job_dir_named(jobs_dir: Path, job_name: str) -> Path | None:
     return candidate if candidate.is_dir() else None
 
 
+def existing_viewer(port: int) -> str | None:
+    """Return what already answers on the port: overlay, plain, or nothing."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(f"http://127.0.0.1:{port}/", timeout=2) as response:
+            body = response.read(65536).decode("utf-8", "replace")
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
+    return "overlay" if "/overlay/nav.js" in body else "plain"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Harbor viewer with the launch overlay.")
     parser.add_argument("--jobs", default=str(JOBS_DIR), help="folder the viewer reads")
-    parser.add_argument("--port", type=int, default=8099)
+    parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--host", default="127.0.0.1")
     args = parser.parse_args(argv)
+
+    existing = existing_viewer(args.port)
+    if existing == "overlay":
+        print(f"Overlay already running at http://127.0.0.1:{args.port}")
+        return 0
+    if existing == "plain":
+        print(
+            f"Port {args.port} is already serving a viewer without the overlay.\n"
+            "Harbor's plain viewer shows raw agent names, no effort suffixes, "
+            "and no Total column.\n\n"
+            "Stop that process first, then run this command again:\n"
+            f"  lsof -nP -iTCP:{args.port} -sTCP:LISTEN",
+            file=sys.stderr,
+        )
+        return 1
 
     import uvicorn
 

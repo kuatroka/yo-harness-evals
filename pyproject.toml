@@ -9,6 +9,7 @@ dependencies = [
 ]
 
 [project.scripts]
+harbor-yo-overlay = "viewer_overlay.app:main"
 harbor-overlay = "viewer_overlay.app:main"
 
 [build-system]

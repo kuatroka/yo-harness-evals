@@ -101,8 +101,11 @@ For a comparison that scales past a handful of models, use `bench/`. Registries 
 ## Viewer
 
 ```bash
-./scripts/harbor_view.sh                 # http://127.0.0.1:8080
+uv run harbor-yo-overlay                 # http://127.0.0.1:8080
+./scripts/harbor_view.sh                 # same, with PORT/JOBS_DIR defaults
 ```
+
+`harbor-yo-overlay` is the console script for the overlay. It takes `--jobs` and `--port`, defaults to `jobs` on 8080, and refuses to start when the port is already serving a viewer without the overlay. `scripts/harbor_view.sh` wraps it with `JOBS_DIR` and `PORT` defaults.
 
 The overlay in `viewer_overlay/` imports Harbor's own `create_app` and splices its routes in front of the SPA fallback. It serves `/launch` for a new run or a rerun, and rewrites agent names, model labels and token totals in API responses. Nothing under `site-packages` is edited, so a Harbor upgrade cannot revert it.
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# The single entry point for the viewer with the launch overlay.
+# The viewer with the launch overlay.
 #
-#   scripts/harbor_view.sh                      # jobs/ on port 8080
-#   PORT=8100 scripts/harbor_view.sh            # another port
+#   uv run harbor-yo-overlay                     # jobs/ on port 8080
+#   scripts/harbor_view.sh                       # same, with PORT/JOBS_DIR defaults
+#   PORT=8100 scripts/harbor_view.sh             # another port
 #   JOBS_DIR=/tmp/jobs scripts/harbor_view.sh    # another job folder
 #
 # Nothing under site-packages is touched: the overlay rebuilds Harbor's static
@@ -15,4 +16,4 @@ cd "$ROOT"
 JOBS_DIR="${JOBS_DIR:-jobs}"
 PORT="${PORT:-8080}"
 
-exec uv run python -m viewer_overlay.app --jobs "$JOBS_DIR" --port "$PORT" "$@"
+exec uv run harbor-yo-overlay --jobs "$JOBS_DIR" --port "$PORT" "$@"
