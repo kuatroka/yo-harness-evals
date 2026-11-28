@@ -19,8 +19,8 @@ ATTEMPTS="${ATTEMPTS:-2}"
 # exclusion set already covers AgentTimeoutError and NonZeroAgentExitCodeError,
 # so this repairs infrastructure failures without resampling real failures.
 RETRIES="${RETRIES:-2}"
-CLAUDE_SHIM_PORT="${CLAUDE_SHIM_PORT:-20140}"
-CLAUDE_BASE_URL="${CLAUDE_BASE_URL:-http://host.docker.internal:$CLAUDE_SHIM_PORT}"
+POLICY_SHIM_PORT="${POLICY_SHIM_PORT:-20140}"
+CLAUDE_BASE_URL="${CLAUDE_BASE_URL:-http://host.docker.internal:$POLICY_SHIM_PORT}"
 CLAUDE_SMALL_MODEL="${CLAUDE_SMALL_MODEL:-devin/swe-2-flash-max}"
 CONCURRENCY="${CONCURRENCY:-1}"
 RUN_ID="${RUN_ID:-$(date +%Y%m%d-%H%M%S)}"
@@ -131,25 +131,25 @@ done
 
 mkdir -p "$JOBS_DIR" "$LOG_DIR"
 
-claude_shim_ready() {
-  curl -fsS -m 2 -o /dev/null "http://127.0.0.1:$CLAUDE_SHIM_PORT/health" 2>/dev/null
+policy_shim_ready() {
+  curl -fsS -m 2 -o /dev/null "http://127.0.0.1:$POLICY_SHIM_PORT/health" 2>/dev/null
 }
 
-CLAUDE_SHIM_PID=""
-ensure_claude_shim() {
-  if claude_shim_ready; then
+POLICY_SHIM_PID=""
+ensure_policy_shim() {
+  if policy_shim_ready; then
     return 0
   fi
-  python3 "$ROOT/scripts/claude_identity_shim.py" --port "$CLAUDE_SHIM_PORT" --quiet &
-  CLAUDE_SHIM_PID=$!
+  python3 "$ROOT/scripts/devin_policy_shim.py" --port "$POLICY_SHIM_PORT" --quiet &
+  POLICY_SHIM_PID=$!
   local attempt
   for attempt in $(seq 1 40); do
-    if claude_shim_ready; then
+    if policy_shim_ready; then
       return 0
     fi
     sleep 0.25
   done
-  echo "claude identity shim failed to start on port $CLAUDE_SHIM_PORT" >&2
+  echo "devin policy shim failed to start on port $POLICY_SHIM_PORT" >&2
   return 1
 }
 
@@ -166,12 +166,12 @@ claude_direct_token() {
     | "$ROOT/.venv/bin/python" -c 'import json, sys; print(json.load(sys.stdin)["claudeAiOauth"]["accessToken"])'
 }
 
-stop_claude_shim() {
-  if [ -n "$CLAUDE_SHIM_PID" ]; then
-    kill "$CLAUDE_SHIM_PID" 2>/dev/null || true
+stop_policy_shim() {
+  if [ -n "$POLICY_SHIM_PID" ]; then
+    kill "$POLICY_SHIM_PID" 2>/dev/null || true
   fi
 }
-trap stop_claude_shim EXIT
+trap stop_policy_shim EXIT
 
 run_job() {
   local harness="$1"
@@ -204,11 +204,21 @@ run_job() {
       agent_args+=(-a "harnesses.amp:AmpAgent")
       ;;
     codex)
+      # Codex reaches every 9router model over the Responses API. Devin rejects
+      # a few lines of Codex's own prompt and two tool descriptions, so Devin
+      # routes go through the policy shim; other upstreams get the bytes as sent.
+      local codex_base_url="http://host.docker.internal:20128/v1"
+      if [ -n "$model_key" ] && [ "$("${REGISTRY_PY[@]}" "$model_key" provider)" = "devin" ]; then
+        if ! ensure_policy_shim; then
+          return 1
+        fi
+        codex_base_url="http://host.docker.internal:$POLICY_SHIM_PORT/v1"
+      fi
       agent_args+=(
         -a "harbor.agents.installed.codex:Codex"
-        --base-url "http://host.docker.internal:20128/v1"
+        --base-url "$codex_base_url"
         --ae "OPENAI_API_KEY=$NINEROUTER_API_KEY"
-        --ae "OPENAI_BASE_URL=http://host.docker.internal:20128/v1"
+        --ae "OPENAI_BASE_URL=$codex_base_url"
         --ak "config=$ROOT/bench/config/codex-base.toml"
       )
       ;;
@@ -239,7 +249,7 @@ run_job() {
         # encoded in the devin/swe-2-* model IDs, so no reasoning_effort kwarg is
         # passed. The small model handles background requests that Claude Code
         # would otherwise send to a stock haiku name.
-        if ! ensure_claude_shim; then
+        if ! ensure_policy_shim; then
           return 1
         fi
         run_prefix=(env "ANTHROPIC_API_KEY=$NINEROUTER_API_KEY")

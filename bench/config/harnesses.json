@@ -21,7 +21,7 @@
     "max_concurrency": 2,
     "effort_syntax": "route-suffix",
     "requires_shim": true,
-    "notes": "Traffic goes through the identity shim on 20140 so Devin accepts the request."
+    "notes": "Traffic goes through the Devin policy shim on 20140 so Devin accepts the request."
   },
   "codex": {
     "agent": "codex",
@@ -29,6 +29,6 @@
     "max_concurrency": 2,
     "effort_syntax": "route-suffix",
     "requires_shim": false,
-    "notes": "OpenAI Codex CLI. Takes --model and -c model_reasoning_effort; 9Router OpenAI-compatible endpoint."
+    "notes": "OpenAI Codex CLI over 9Router's Responses endpoint. Effort lives in the 9Router route id. Devin routes go through the policy shim on 20140; other upstreams do not need it."
   }
 }

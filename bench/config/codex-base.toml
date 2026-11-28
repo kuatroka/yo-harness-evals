@@ -1,21 +1,30 @@
-# Base Codex config for Harbor trials routed through 9router's Devin bridge.
+# Base Codex config for Harbor trials routed through 9router.
 #
-# Two problems are solved here.
+# This is the provider block from Engy's Codex guide
+# (https://engy.ai/docs/integrations/codex) with 9router as the base URL, so it
+# reaches every 9router model: Engy, Devin bridge, cx and the rest. Harbor
+# injects base_url (host.docker.internal) and run_matrix.sh points Devin routes
+# at the policy shim instead of 9router.
 #
-# 1. Auth. Codex attaches the bearer token from env_key when it talks to a
-#    custom provider, so OPENAI_API_KEY must be in the agent's environment.
-#    run_matrix.sh passes it from NINEROUTER_API_KEY. Do not add
-#    requires_openai_auth here: Codex 0.171 reports it as an unrecognized
-#    setting and ignores it, and the jobs that carried it still ran without a
-#    key.
+# Auth. Codex attaches the bearer token from env_key when it talks to a custom
+# provider, so OPENAI_API_KEY must be in the agent's environment. run_matrix.sh
+# passes it from NINEROUTER_API_KEY. Do not add requires_openai_auth here:
+# Codex 0.171 reports it as an unrecognized setting and ignores it.
 #
-# 2. Retry budget. Devin's classifier can block even trivial input, and Codex's
-#    reconnect backoff turns a blocked turn into a long no-op. Measured: 40
-#    retries spent 3h02m and 6 retries spent 44m, both producing zero tokens and
-#    no usable trial. Two retries fail in a couple of minutes, which surfaces a
-#    real ApiOverloadedError; Harbor's attempts and retries cover a later streak.
-#    supports_websockets=false forces plain HTTPS SSE because 9router does not
-#    terminate the Responses WebSocket subprotocol.
+# Retry budget. A rejected request is rejected every time, and after one denial
+# 9router answers 503 for that model id for 30 seconds, so retrying cannot
+# help. Measured: 40 retries spent 3h02m and 6 retries spent 44m, both with zero
+# tokens. Two retries fail in a couple of minutes with a real ApiOverloadedError.
+# supports_websockets=false forces plain HTTPS SSE because 9router does not
+# terminate the Responses WebSocket subprotocol.
+#
+# Devin routes must go through the policy shim even though the shim is no
+# longer a plain proxy for Responses: it terminates the API and translates to
+# chat completions itself. 9router's own Responses translation splits each
+# turn's narration from its tool calls into separate assistant messages, which
+# teaches swe-2-1 to emit narration-only turns that end dead (measured ~35%
+# vs 0% at the same step). The shim's merged translation is what makes codex
+# viable on the Devin bridge at all.
 model_provider = "ninerouter"
 
 [model_providers.ninerouter]

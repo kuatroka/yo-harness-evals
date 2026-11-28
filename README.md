@@ -7,7 +7,7 @@ Local [Frontier Harness](https://frontierharness.org/evaluate-your-own-harness/)
 | Factory Droid | `harnesses.droid:DroidAgent` | 9Router over `host.docker.internal:20128` |
 | Amp Code | `harnesses.amp:AmpAgent` | 9Router through Amp's server-side connection |
 | Claude Code | `harnesses.claude:ClaudeCodeAgent` | 9Router Anthropic endpoint through the identity shim, or Anthropic direct for `native/claude/haiku-5-5-*` |
-| Codex | Harbor's `codex` agent with `bench/config/codex-base.toml` | 9Router OpenAI-compatible endpoint (`cx/…`) |
+| Codex | Harbor's `codex` agent with `bench/config/codex-base.toml` | 9Router Responses endpoint for any 9Router model; Devin routes go through the policy shim |
 
 Model ids are `<transport>/<endpoint>/<model>-<effort>`, for example `9r/dv-bridge/swe-2-1-max`, `9r/engy/deepseek-4-1-flash-1017-max`, `native/amp/haiku-5-5-max` and `native/claude/haiku-5-5-xhigh`. `transport` is `9r`, `native` or `direct`; `endpoint` is the billing path; the last segment is the model plus effort, with dots spelled as hyphens. The harness is a separate registry field, so one route keeps one id across Droid, Amp, Claude and Codex. Slashes are for config, display and joins only: a job folder flattens them to hyphens (`9r-dv-bridge-swe-2-1-max`) and the slash id never becomes a path. A Devin route encodes effort in its route id; a native Anthropic id does not, so `run_matrix.sh` passes `reasoning_effort` for those rows. Droid writes the id as its custom-model label; Amp passes the route with `--model` and the level with `--effort`.
 
@@ -58,7 +58,7 @@ TASKS=fix-code-vulnerability,cancel-async-tasks,sparql-university \
 MODELS=9r/dv-bridge/swe-2-max,9r/dv-bridge/swe-2-flash-max HARNESSES=droid,amp,claude ./scripts/run_matrix.sh
 ```
 
-Add `claude` to `HARNESSES` deliberately. It installs the CLI in the container with apt and bun. Requests to a non-Anthropic model go through `scripts/claude_identity_shim.py` on port 20140, which the matrix starts and stops on its own. The shim removes the three paragraphs of Claude Code's prompt that Devin's content policy rejects and forwards everything else untouched. On an Anthropic model the CLI talks to `api.anthropic.com` with the host's token and no shim, per the routing rule above. Effort comes from the model's registry row; `run_matrix.sh` passes it as `reasoning_effort` and runs `scripts/backfill_metadata.py` afterward so the viewer shows it on trials whose adapter does not record the kwarg.
+Add `claude` to `HARNESSES` deliberately. It installs the CLI in the container with apt and bun. Requests to a non-Anthropic model go through `scripts/devin_policy_shim.py` on port 20140, which the matrix starts and stops on its own. The shim removes the three paragraphs of Claude Code's prompt that Devin's content policy rejects and forwards everything else untouched. Codex uses the same shim on Devin routes only. On an Anthropic model the CLI talks to `api.anthropic.com` with the host's token and no shim, per the routing rule above. Effort comes from the model's registry row; `run_matrix.sh` passes it as `reasoning_effort` and runs `scripts/backfill_metadata.py` afterward so the viewer shows it on trials whose adapter does not record the kwarg.
 
 ## Reading the results
 
@@ -72,8 +72,8 @@ Each trial carries `reward_valid`, set from its exception type. Timeouts and non
 
 | Script | Purpose |
 |---|---|
-| `scripts/run_matrix.sh` | Runs the jobs, starts and stops the Claude Code shim, backfills metadata |
-| `scripts/claude_identity_shim.py` | Strips the three prompt paragraphs Devin's policy rejects, forwards everything else |
+| `scripts/run_matrix.sh` | Runs the jobs, starts and stops the Devin policy shim, backfills metadata |
+| `scripts/devin_policy_shim.py` | Strips the Claude Code and Codex prompt text Devin's policy rejects, forwards everything else |
 | `scripts/backfill_metadata.py` | Records the reasoning effort the viewer reads, derived from the model ID when no kwarg carries it |
 | `scripts/replace_trial.py` | Swaps a rerun into a finished job, archives the trial it replaced under `archive/replaced-trials/`, recomputes the job stats |
 
@@ -95,7 +95,8 @@ For a comparison that scales past a handful of models, use `bench/`. Registries 
 | `NonZeroAgentExitCodeError` with exit 143 and an empty agent log | Something sent SIGTERM to the agent process. Not the agent timeout, which raises `AgentTimeoutError` instead | Seen once, on `install-windows-3.11`, after ten minutes of normal model traffic. Reward stays valid, so it counts as a real `0.0` |
 | Install fails on Alpine or musl | Droid and Amp ship glibc binaries | Use a Debian or Ubuntu task image |
 | Claude Code gets 401 or model-not-found | Needs the Anthropic Messages endpoint and key | `--base-url .../v1` plus `ANTHROPIC_API_KEY`, not the OpenAI format |
-| Claude Code retries forever, Devin returns `permission_denied` content policy | Devin rejects three paragraphs of Claude Code's own prompt: the Anthropic identity line, the security-policy paragraph, and the Claude vendor paragraph. Tools, metadata, thinking and the task prompt are innocent | Handled by `scripts/claude_identity_shim.py`, which the matrix starts on port 20140 and points Claude Code at |
+| Claude Code retries forever, Devin returns `permission_denied` content policy | Devin rejects three paragraphs of Claude Code's own prompt: the Anthropic identity line, the security-policy paragraph, and the Claude vendor paragraph. Tools, metadata, thinking and the task prompt are innocent | Handled by `scripts/devin_policy_shim.py`, which the matrix starts on port 20140 and points Claude Code at |
+| Codex on a Devin route fails with `permission_denied: Unable to process request due to an MCP configuration issue` | Not MCP and not intermittent. Devin rejects one paragraph and one line of Codex's prompt (`Codex refers to the open-source agentic coding interface`, `the CLI renderer applies them`) and the `exec_command` and `write_stdin` descriptions. After one denial 9Router locks that model id for 30 s, so any probe in that window looks denied too | `run_matrix.sh` sends Devin rows through `scripts/devin_policy_shim.py`, which drops that text and swaps the two descriptions |
 
 ## Viewer
 
